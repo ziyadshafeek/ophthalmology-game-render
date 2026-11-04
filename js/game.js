@@ -407,6 +407,7 @@
       } catch (e2) {}
     };
     document.addEventListener('ophth-voice-end', function () { var b = $('speakerBtn'); if (b) b.textContent = '🔊'; });
+    document.addEventListener('ophth-voice-start', function () { var b = $('speakerBtn'); if (b) b.textContent = '⏹️'; });
     $('pwFifty').onclick = function () {
       if (!G || G.locked || G.pw.fifty <= 0) return;
       G.pw.fifty--; OphthAudio.sfx('power');

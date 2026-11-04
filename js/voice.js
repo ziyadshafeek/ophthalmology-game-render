@@ -38,7 +38,7 @@
   function usePiper() { return settings.mode !== 'browser' && settings.mode !== 'off' && !isMobile && !piper.slow && piper.state === 'ready' && !!piper.mod; }
   function setSpeaking(v) {
     speaking = !!v;
-    if (!v) { try { document.dispatchEvent(new CustomEvent('ophth-voice-end')); } catch (e) {} }
+    try { document.dispatchEvent(new CustomEvent(v ? 'ophth-voice-start' : 'ophth-voice-end')); } catch (e) {}
   }
   function isSpeaking() { return speaking; }
 
@@ -127,15 +127,30 @@
       if (tok !== speechToken || settings.muted || i >= chunks.length) { if (keepAlive) clearInterval(keepAlive); setSpeaking(false); return; }
       var spoken = expandAbbr(chunks[i++]), advanced = false, watchdog = null;
       function adv() { if (advanced) return; advanced = true; if (watchdog) clearTimeout(watchdog); next(); }
-      var u = new SpeechSynthesisUtterance(spoken);
-      if (chosenVoice) { u.voice = chosenVoice; u.lang = chosenVoice.lang; } else u.lang = 'en-IN';
-      u.rate = settings.rate; u.pitch = 1;
-      u.onend = adv; u.onerror = adv;
-      /* Watchdog: kill the stuck utterance first, then move on — otherwise
-         Android Chrome queues the next chunk behind a dead one and the
-         voice runs minutes behind the game, or never at all. */
-      watchdog = setTimeout(function () { try { speechSynthesis.cancel(); } catch (e) {} adv(); }, chunkBudgetMs(spoken));
-      try { speechSynthesis.speak(u); } catch (e) { adv(); }
+      /* One chunk, spoken once — with a default-voice retry if the picked
+         voice errors. A picked voice that silently fails was the most
+         likely reason a phone heard nothing at all while the chain
+         happily advanced chunk by chunk. On phones no voice is picked
+         at all: the system default voice is the one that is guaranteed
+         to work on that phone, and 'en' avoids failing on a missing
+         en-IN voice pack. */
+      function speakChunk(useDefault) {
+        var u = new SpeechSynthesisUtterance(spoken);
+        if (!useDefault && !isMobile && chosenVoice) { u.voice = chosenVoice; u.lang = chosenVoice.lang; }
+        else u.lang = 'en';
+        u.rate = settings.rate; u.pitch = 1;
+        u.onend = adv;
+        u.onerror = function () {
+          if (!useDefault && !isMobile && chosenVoice) { try { if (watchdog) clearTimeout(watchdog); } catch (e) {} speakChunk(true); }
+          else adv();
+        };
+        /* Watchdog: kill the stuck utterance first, then move on — otherwise
+           Android Chrome queues the next chunk behind a dead one and the
+           voice runs minutes behind the game, or never at all. */
+        watchdog = setTimeout(function () { try { speechSynthesis.cancel(); } catch (e) {} adv(); }, chunkBudgetMs(spoken));
+        try { speechSynthesis.speak(u); } catch (e) { adv(); }
+      }
+      speakChunk(false);
     })();
   }
   /* Start a chunk chain after a short settle: Android Chrome stalls if a

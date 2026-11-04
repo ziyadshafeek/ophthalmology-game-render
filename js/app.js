@@ -138,5 +138,13 @@
       if (OphthSettings.muted) OphthVoice.stopSpeak();
       syncSettingsUI();
     };
+    $('testVoiceBtn').onclick = function () {
+      /* A direct user tap, so the phone's speech engine is definitely
+         allowed to speak — if this is silent, the problem is the phone's
+         media volume or speech engine, not auto-read timing. Unmutes
+         first so the test always makes a sound when the engine works. */
+      if (OphthSettings.muted) { OphthSettings.muted = false; saveOphthSettings(); syncSettingsUI(); }
+      try { OphthVoice.speakFullText('Voice test. This is the ophthalmology arena voice. If you can hear this, voice is working.'); } catch (e) {}
+    };
   });
 })();
