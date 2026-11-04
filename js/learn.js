@@ -123,6 +123,7 @@
     $('gradeMiss').onclick = function () { grade(false); };
     $('gradeGot').onclick = function () { grade(true); };
     $('learnSpeakerBtn').onclick = function () {
+      try { OphthVoice.prime(); } catch (e) {}
       if (!L || !L.cur) return;
       try { if (OphthVoice.isSpeaking && OphthVoice.isSpeaking()) { OphthVoice.stopSpeak(); return; } } catch (e) {}
       try {

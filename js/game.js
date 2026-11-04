@@ -387,16 +387,18 @@
     };
     window.addEventListener('pagehide', saveGame);
     window.addEventListener('beforeunload', saveGame);
-    $('playBtn').onclick = function () { try { OphthAudio.ac(); OphthAudio.sfx('level'); } catch (e) {} newGame(); };
+    $('playBtn').onclick = function () { try { OphthVoice.prime(); } catch (e) {} try { OphthAudio.ac(); OphthAudio.sfx('level'); } catch (e) {} newGame(); };
     $('againBtn').onclick = function () { try { OphthAudio.sfx('click'); } catch (e) {} newGame(); };
     $('menuBtn').onclick = function () { OphthHome(); };
     $('quitGameBtn').onclick = function () { try { OphthVoice.stopSpeak(); } catch (e) {} OphthHome(); };
     $('nextBtn').onclick = nextRound;
     $('replayRevealBtn').onclick = function () {
+      try { OphthVoice.prime(); } catch (e) {}
       try { if (OphthVoice.isSpeaking && OphthVoice.isSpeaking()) { OphthVoice.stopSpeak(); return; } } catch (e) {}
       if (lastRevealText) { try { OphthVoice.speakFullText(lastRevealText); } catch (e2) {} }
     };
     $('speakerBtn').onclick = function () {
+      try { OphthVoice.prime(); } catch (e) {}
       /* Speech button is a toggle: tap while it is reading to stop it at
          once, instead of stacking another full reading on top. */
       try { if (OphthVoice.isSpeaking && OphthVoice.isSpeaking()) { OphthVoice.stopSpeak(); $('speakerBtn').textContent = '🔊'; return; } } catch (e) {}

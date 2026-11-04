@@ -127,6 +127,7 @@
       var b = $(id); if (b) b.onclick = function () { OphthAudio.sfx('click'); toggleFullscreen(); };
     });
     syncSettingsUI();
+    try { if (!('speechSynthesis' in window)) { var w = $('voiceWarn'); if (w) w.style.display = 'block'; } } catch (e) {}
     $('settingsBtn').onclick = function () { OphthAudio.sfx('click'); showScreen('settingsScreen'); syncSettingsUI(); };
     $('settingsBack').onclick = function () { goHome(); };
     $('voiceMode').onchange = function () { OphthSettings.mode = this.value; saveOphthSettings(); OphthVoice.updateVoiceStatus(); };
@@ -143,7 +144,11 @@
          allowed to speak — if this is silent, the problem is the phone's
          media volume or speech engine, not auto-read timing. Unmutes
          first so the test always makes a sound when the engine works. */
-      if (OphthSettings.muted) { OphthSettings.muted = false; saveOphthSettings(); syncSettingsUI(); }
+      if (OphthSettings.muted || OphthSettings.mode === 'off' || !OphthSettings.autoRead) {
+        OphthSettings.muted = false; OphthSettings.mode = 'browser'; OphthSettings.autoRead = true;
+        saveOphthSettings(); syncSettingsUI();
+      }
+      try { OphthVoice.prime(); } catch (e) {}
       try { OphthVoice.speakFullText('Voice test. This is the ophthalmology arena voice. If you can hear this, voice is working.'); } catch (e) {}
     };
   });

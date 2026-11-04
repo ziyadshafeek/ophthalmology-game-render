@@ -227,7 +227,20 @@
     var el = document.getElementById('voiceStatus');
     if (el) el.textContent = voiceStatusText();
   }
+  function prime() {
+    /* Call synchronously inside a tap handler. Volume 0, blank text:
+       nothing audible, but the engine has now spoken once from a real
+       user gesture, which is what Android needs before later async
+       speaks (question / reveal) are allowed to make a sound. The fast
+       HTML version spoke synchronously from its Start tap; this site's
+       first speak is async (data fetch + delays), which is the most
+       likely reason it worked in HTML and never on this site. */
+    try {
+      if (ttsOK) { var u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }
+    } catch (e) {}
+  }
   window.OphthVoice = {
+    prime: prime,
     settings: settings, saveSettings: saveSettings, initPiper: initPiper, piperState: piperState, piperProgress: piperProgress,
     splitFull: splitFull, speakFullText: speakFullText, speakTexts: speakTexts, stopSpeak: stopSpeak, isSpeaking: isSpeaking,
     updateVoiceStatus: updateVoiceStatus, voiceStatusText: voiceStatusText
