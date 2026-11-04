@@ -154,7 +154,7 @@
       OphthSettings.sounds = true; OphthSettings.muted = false;
       OphthSettings.mode = 'local'; OphthSettings.autoRead = true;
       saveOphthSettings(); syncSettingsUI();
-      try { OphthVoice.initPiper(); } catch (e) {}
+      try { if (OphthVoice.retryPiper) OphthVoice.retryPiper(); else OphthVoice.initPiper(); } catch (e) {}
     };
     $('testVoiceBtn').onclick = function () {
       /* A direct user tap, so the phone's speech engine is definitely

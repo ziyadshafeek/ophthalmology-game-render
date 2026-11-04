@@ -129,7 +129,13 @@
     piper.state = 'loading';
     import('https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm').then(function (mod) {
       piper.mod = mod;
-      return mod.download(PIPER_VOICE, function (pr) { if (pr && pr.total) piper.pct = Math.max(piper.pct, pr.loaded / pr.total); });
+      return mod.download(PIPER_VOICE, function (pr) {
+        var pct = null;
+        if (typeof pr === 'number' && isFinite(pr)) pct = pr;
+        else if (pr && pr.total) pct = pr.loaded / pr.total;
+        else if (pr && pr.totalBytes) pct = pr.loadedBytes / pr.totalBytes;
+        if (pct !== null && isFinite(pct)) { piper.pct = Math.max(piper.pct, Math.max(0, Math.min(1, pct))); updateVoiceStatus(); }
+      });
     }).then(function () { piper.state = 'ready'; piper.pct = 1; vlog('Local model ready (main thread).'); updateVoiceStatus(); flushPending(); })
       .catch(function () { piper.state = 'failed'; vlog('Local model download failed.'); updateVoiceStatus(); if (wp.state === 'failed') flushPendingToBrowser(); });
   }
@@ -333,6 +339,30 @@
   function updateVoiceStatus() {
     var el = document.getElementById('voiceStatus');
     if (el) el.textContent = voiceStatusText();
+    /* Home line: the download must be visible without opening Settings,
+       or the user cannot tell whether it is downloading, ready, or
+       failed. */
+    try {
+      var hv = document.getElementById('homeVoiceLine');
+      if (hv) {
+        if (isMobile && settings.mode !== 'browser' && settings.mode !== 'off') {
+          if (wp.state === 'ready' || piper.state === 'ready') hv.textContent = 'Local voice: ready';
+          else if (wp.state === 'loading' || piper.state === 'loading') hv.textContent = 'Local voice: downloading… ' + Math.round(piperProgress() * 100) + '% — keep this tab open';
+          else if (wp.state === 'failed' && piper.state === 'failed') hv.textContent = 'Local voice: download failed — reopen to retry';
+          else hv.textContent = 'Local voice: starting…';
+        } else if (settings.mode === 'off') hv.textContent = 'Voice: off';
+        else hv.textContent = 'Voice: browser voice';
+      }
+    } catch (e) {}
+  }
+  function retryPiper() {
+    /* Force a fresh download attempt even if a previous attempt is
+       stuck in 'loading': terminate the old worker and start again. */
+    try { if (wp.worker) wp.worker.terminate(); } catch (e) {}
+    wp.worker = null; wp.state = 'idle'; wp.pct = 0; wp.pending = {};
+    piper.state = 'idle'; piper.pct = 0; piper.mod = null;
+    vlog('Retrying local voice download…');
+    initPiper();
   }
   function prime() {
     /* Call synchronously inside a tap handler. Volume 0, blank text:
@@ -347,7 +377,7 @@
     } catch (e) {}
   }
   window.OphthVoice = {
-    prime: prime,
+    prime: prime, retryPiper: retryPiper,
     settings: settings, saveSettings: saveSettings, initPiper: initPiper, piperState: piperState, piperProgress: piperProgress,
     splitFull: splitFull, speakFullText: speakFullText, speakTexts: speakTexts, stopSpeak: stopSpeak, isSpeaking: isSpeaking,
     updateVoiceStatus: updateVoiceStatus, voiceStatusText: voiceStatusText

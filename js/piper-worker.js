@@ -16,7 +16,16 @@ self.onmessage = async function (ev) {
     try {
       mod = await import('https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm');
       await mod.download(PIPER_VOICE, function (pr) {
-        if (pr && pr.total) post({ type: 'progress', pct: pr.loaded / pr.total });
+        /* vits-web's progress shape is not guaranteed: it may be a
+           fraction, or {loaded,total}, or {loadedBytes,totalBytes}.
+           The old code only handled {loaded,total}, so on other
+           shapes no progress was ever reported and the download
+           looked stuck at 0% even while it was running. */
+        var pct = null;
+        if (typeof pr === 'number' && isFinite(pr)) pct = pr;
+        else if (pr && pr.total) pct = pr.loaded / pr.total;
+        else if (pr && pr.totalBytes) pct = pr.loadedBytes / pr.totalBytes;
+        if (pct !== null && isFinite(pct)) post({ type: 'progress', pct: Math.max(0, Math.min(1, pct)) });
       });
       ready = true; loading = false;
       post({ type: 'ready' });
