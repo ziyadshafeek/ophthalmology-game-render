@@ -128,6 +128,15 @@
     });
     syncSettingsUI();
     try { if (!('speechSynthesis' in window)) { var w = $('voiceWarn'); if (w) w.style.display = 'block'; } } catch (e) {}
+    try {
+      /* Android WebView (in-app browser) has no working speechSynthesis
+         and stricter media-gesture rules than full Chrome. Warn plainly
+         so the user does not debug voice inside the wrong container. */
+      if (/;\s*wv\)/.test(navigator.userAgent || '')) {
+        var wv = $('voiceWarn');
+        if (wv) { wv.textContent = '⚠️ Opened inside another app\'s browser — open this link in Chrome itself for sound and voice.'; wv.style.display = 'block'; }
+      }
+    } catch (e) {}
     $('settingsBtn').onclick = function () { OphthAudio.sfx('click'); showScreen('settingsScreen'); syncSettingsUI(); };
     $('settingsBack').onclick = function () { goHome(); };
     $('voiceMode').onchange = function () {

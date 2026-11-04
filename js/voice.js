@@ -196,12 +196,25 @@
         : piper.mod.predict({ text: tx, voiceId: PIPER_VOICE });
       predictP.then(function (blob) {
         if (tok !== piper.token) { adv(); return; }
-        var url = URL.createObjectURL(blob), a = new Audio();
+        var url = URL.createObjectURL(blob), a = getSharedAudio() || new Audio();
         piper.audio = a; a.src = url;
         try { a.playbackRate = settings.rate; a.preservesPitch = true; } catch (e) {}
         a.onended = function () { URL.revokeObjectURL(url); if (piper.audio === a) piper.audio = null; adv(); };
         a.onerror = function () { vlog('Local audio playback error.'); URL.revokeObjectURL(url); adv(); };
-        var p = a.play(); if (p && p.catch) p.catch(function (e) { vlog('Local audio play blocked: ' + String((e && e.message) || e)); adv(); });
+        var p = a.play();
+        if (p && p.catch) p.catch(function (e) {
+          var nm = (e && e.name) || '';
+          if (nm === 'NotAllowedError') {
+            /* Playback gate, not synthesis: the browser refused this
+               play because it is too long after the last tap. Do NOT
+               silently advance through the rest of the chain — stop,
+               log it plainly, and the next speaker tap (a fresh
+               gesture, with the shared element already unlocked)
+               re-speaks the full text. */
+            vlog('Audio play blocked by browser — tap the speaker again to hear.');
+            setSpeaking(false);
+          } else { vlog('Local audio play blocked: ' + String((e && e.message) || e)); adv(); }
+        });
       }).catch(function (e) { vlog('Local synthesis failed: ' + String((e && e.message) || e)); adv(); });
     })();
   }
@@ -232,8 +245,8 @@
         else u.lang = 'en';
         u.rate = settings.rate; u.pitch = 1;
         u.onend = adv;
-        u.onerror = function () {
-          vlog('Browser voice error on this chunk.');
+        u.onerror = function (e) {
+          vlog('Browser voice error: ' + ((e && e.error) || 'unknown'));
           if (!useDefault && !isMobile && chosenVoice) { try { if (watchdog) clearTimeout(watchdog); } catch (e) {} speakChunk(true); }
           else adv();
         };
@@ -287,11 +300,11 @@
     try {
       setSpeaking(false);
       if (ttsOK) {
+        /* Cancel only. Do NOT pause() here: on Android Chrome, pause()
+           after cancel() wedges the engine so later utterances queue
+           but never sound. The keep-alive resume() in browserSpeak
+           still runs if the system itself pauses the engine. */
         try { speechSynthesis.cancel(); } catch (e) {}
-        /* Flush a stuck Android queue: cancel alone sometimes leaves the
-           engine believing it is still speaking. */
-        try { speechSynthesis.pause(); } catch (e2) {}
-        try { speechSynthesis.resume(); } catch (e3) {}
       }
       speechToken++;
       piper.token++;
@@ -364,6 +377,28 @@
     vlog('Retrying local voice download…');
     initPiper();
   }
+  /* ONE shared <audio> element for all local-voice playback. The old
+     code created a new Audio() per chunk and only primed speechSynthesis
+     on tap — but <audio>.play() is gated separately, and a play() made
+     minutes after the last tap (e.g. after a model download) is
+     rejected with NotAllowedError, which the old code swallowed by
+     silently advancing to the next chunk. A silent chain that "completes"
+     is exactly what the user reported. The shared element is primed
+     with a silent WAV inside a real click handler, then reused for
+     every chunk, so later plays on that element are permitted. */
+  var SILENT_WAV = 'data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+  var sharedAudio = null;
+  function getSharedAudio() {
+    if (!sharedAudio) { try { sharedAudio = new Audio(); sharedAudio.preload = 'auto'; } catch (e) { sharedAudio = null; } }
+    return sharedAudio;
+  }
+  function unlockAudio() {
+    try {
+      var a = getSharedAudio();
+      if (a) { a.src = SILENT_WAV; var p = a.play(); if (p && p.then) p.then(function () { try { a.pause(); } catch (e) {} }).catch(function () {}); }
+    } catch (e) {}
+    try { if (window.OphthAudio && window.OphthAudio.ac) window.OphthAudio.ac(); } catch (e) {}
+  }
   function prime() {
     /* Call synchronously inside a tap handler. Volume 0, blank text:
        nothing audible, but the engine has now spoken once from a real
@@ -372,6 +407,7 @@
        HTML version spoke synchronously from its Start tap; this site's
        first speak is async (data fetch + delays), which is the most
        likely reason it worked in HTML and never on this site. */
+    try { unlockAudio(); } catch (e) {}
     try {
       if (ttsOK) { var u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }
     } catch (e) {}
