@@ -1,0 +1,112 @@
+:root{--bg:#020610;--panel:#071120;--panel2:#0a1830;--line:#1d3a5f;--text:#e8f6ff;--muted:#8fb4d8;--cyan:#00e5ff;--amber:#ffb300;--yellow:#fef08a;--red:#ff2e63;--green:#2effa8;--orange:#ff7a18;--mag:#ff2ea6;--violet:#8b5cf6;--neon:#00f0ff;--cut:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Sora,system-ui,sans-serif;overflow-x:hidden}
+body{background-image:radial-gradient(760px 430px at 12% -5%,rgba(0,240,255,.16),transparent 60%),radial-gradient(720px 420px at 92% 0%,rgba(255,46,166,.10),transparent 60%),linear-gradient(rgba(0,240,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.05) 1px,transparent 1px);background-size:auto,auto,34px 34px,34px 34px;min-height:100dvh}
+button{font:inherit;cursor:pointer}button:focus-visible{outline:2px solid var(--neon);outline-offset:2px}button:disabled{opacity:.4;cursor:default}
+.wrap{max-width:980px;margin:0 auto;padding:14px 14px 40px}
+.screen{display:none}.screen.on{display:block}
+.kicker{font-family:"Share Tech Mono",ui-monospace,monospace;letter-spacing:.28em;font-size:11px;color:var(--neon);text-shadow:0 0 12px rgba(0,240,255,.6)}
+/* Boot: the ONLY loading UI. Voice-model load stays hidden inside it. */
+#bootScreen{position:fixed;inset:0;background:#020610;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity .5s}
+#bootScreen.done{opacity:0;pointer-events:none}
+.bootBox{width:min(560px,100%);border:1px solid var(--line);background:var(--panel);clip-path:var(--cut);padding:20px}
+.bootKicker{font-family:"Share Tech Mono",monospace;color:var(--neon);letter-spacing:.2em;font-size:12px;margin-bottom:14px}
+.bootLog{font-family:"Share Tech Mono",monospace;font-size:13px;line-height:1.9;min-height:180px;color:var(--text)}.bootLog .dim{color:var(--muted)}
+.bootBarWrap{height:12px;background:#050d1a;border:1px solid var(--line);margin-top:14px;overflow:hidden}
+#bootBar{height:100%;width:0;background:repeating-linear-gradient(45deg,var(--neon) 0 12px,#0aa8c4 12px 24px);transition:width .2s}
+.bootRow{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:"Share Tech Mono",monospace;color:var(--muted)}
+.bootSkip{background:transparent;border:1px solid var(--line);color:var(--text);padding:6px 14px}
+/* Home */
+.hero{text-align:center;padding:26px 0 8px}
+h1.gameTitle{font-family:"Chakra Petch";font-size:clamp(40px,9vw,80px);line-height:.92;margin:12px 0;text-transform:uppercase}
+h1.gameTitle span{color:var(--neon);text-shadow:0 0 34px rgba(0,240,255,.85)}h1.gameTitle em{font-style:normal;color:var(--mag);text-shadow:0 0 30px rgba(255,46,166,.65)}
+.oneLine{color:var(--muted);margin:0 0 22px;font-size:15px}
+.homeGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:560px;margin:0 auto}
+.homeBtn{display:flex;align-items:center;justify-content:center;gap:12px;background:var(--panel);border:1px solid var(--line);clip-path:var(--cut);color:var(--text);padding:22px 12px;font-family:"Chakra Petch";font-weight:700;font-size:20px;letter-spacing:.08em}
+.homeBtn.primary{background:linear-gradient(90deg,#00c8de,#00f0ff 55%,#37f5ff);color:#02141c;border-color:#8ff7ff;box-shadow:0 0 34px rgba(0,240,255,.5)}
+.homeBtn .hbIc{font-size:26px}
+.bestLine{font-family:"Share Tech Mono",monospace;color:var(--muted);font-size:13px;margin-top:20px}.bestLine strong{color:var(--neon)}
+/* HUD + arena */
+.hud{margin-top:6px}.hudTop{display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between}
+.pill{background:var(--panel);border:1px solid var(--line);padding:9px 12px;font-family:"Chakra Petch";display:flex;align-items:center;gap:8px}
+.pill small{color:var(--muted);letter-spacing:.14em;font-size:10px;font-family:"Share Tech Mono",monospace}.pill strong{font-size:18px;line-height:1}
+#scoreVal{color:var(--neon)}#comboPill.hot{border-color:var(--orange);box-shadow:0 0 18px rgba(255,122,24,.5)}#comboMult{color:var(--orange)}
+.hearts{font-size:18px;letter-spacing:2px}.hearts .lost{filter:grayscale(1);opacity:.28}.hearts .beat{display:inline-block}
+.timerWrap{margin:12px 0 8px;background:#050d1a;border:1px solid var(--line);height:16px;overflow:hidden;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+#timerBar{height:100%;width:100%;background:repeating-linear-gradient(45deg,var(--neon) 0 12px,#0aa8c4 12px 24px);transition:width .1s linear}
+.timerWrap.low #timerBar{background:repeating-linear-gradient(45deg,#ff2e63 0 12px,#c21140 12px 24px)}
+.hudRow{display:flex;justify-content:space-between;align-items:center;font-family:"Chakra Petch";margin-bottom:6px}
+.iconBtn{background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:20px;padding:6px 12px;clip-path:var(--cut)}
+.progressDots{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}.dot{width:22px;height:7px;background:#16324f;clip-path:polygon(3px 0,100% 0,calc(100% - 3px) 100%,0 100%)}.dot.done{background:var(--green)}.dot.now{background:var(--neon)}
+.powers{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.pwBtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:10px 14px;font-size:18px;clip-path:var(--cut)}.pwBtn.activeShield{border-color:var(--green);box-shadow:0 0 14px rgba(46,255,168,.5)}.pwCount{font-size:13px;color:var(--neon);font-family:"Chakra Petch"}
+.arena{margin-top:4px}.photoStage{text-align:center;margin:12px 0}.photoStage img{max-width:100%;max-height:340px;border:1px solid var(--line);background:#000}
+.photoCap{color:var(--muted);font-size:13px;margin-top:6px}
+.qHead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.tag{font-family:"Chakra Petch";color:var(--neon);letter-spacing:.08em;font-size:14px}.tag.useTag{color:var(--amber)}.tag.bossTag{color:#ff7ac0}
+.pointsTag{font-family:"Share Tech Mono",monospace;color:var(--muted);font-size:12px}
+h2{font-family:"Chakra Petch"}.qClue{color:var(--text);line-height:1.6;font-size:16px}
+.hintBox{display:none;background:#1a2b00;border:1px solid #5a7a00;padding:12px;line-height:1.55;margin:10px 0}.hintBox.on{display:block}
+.opts{display:grid;gap:10px;margin:14px 0}
+.opt{display:flex;gap:10px;align-items:center;text-align:left;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:14px;clip-path:var(--cut);font-size:15px;line-height:1.45}
+.opt:hover{border-color:var(--neon)}.opt.correct{border-color:var(--green);background:#06351f}.opt.wrong{border-color:var(--red);background:#3a0a18}.opt.eliminated{opacity:.25}
+.opt .key{font-family:"Chakra Petch";color:var(--neon);border:1px solid var(--line);padding:4px 9px;flex:none}
+.feedback{display:none;border:1px solid var(--line);background:var(--panel);clip-path:var(--cut);padding:16px;margin:14px 0;line-height:1.6}
+.feedback.on{display:block}.feedback.good{border-color:var(--green)}.feedback.bad{border-color:var(--red)}
+.fbTitle{font-family:"Chakra Petch";font-size:18px}.fbUse{margin:8px 0}
+.viva{background:rgba(0,240,255,.07);border-left:3px solid var(--neon);padding:10px;margin:10px 0}
+.yellowNote{background:var(--yellow);color:#111;padding:12px;margin:10px 0;line-height:1.65;border:1px solid #d4b800}
+.yellowNote:empty{display:none}
+.fullDet{margin:10px 0}.fullDet summary{cursor:pointer;color:var(--neon);font-family:"Chakra Petch"}
+.noteBody{line-height:1.65;color:var(--text);margin-top:8px}.noteBody b{color:#fff}
+.btnRow{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:13px 20px;clip-path:var(--cut);font-family:"Chakra Petch";font-weight:600}
+.btn.primary{background:linear-gradient(90deg,#00c8de,#00f0ff);color:#02141c;border-color:#8ff7ff}
+.btn.good{border-color:var(--green);color:var(--green)}.btn.bad{border-color:var(--red);color:#ff8aa5}.btn.ghost{background:transparent}
+.overlay{display:none;position:fixed;inset:0;background:rgba(2,6,16,.88);z-index:90;align-items:center;justify-content:center;padding:20px}
+.overlay.on{display:flex}.overlayBox{text-align:center;border:1px solid var(--line);background:var(--panel);clip-path:var(--cut);padding:26px;max-width:520px}
+/* Results */
+.resultBox{text-align:center;padding:30px 10px}.rankLine{font-family:"Chakra Petch";font-size:20px;color:var(--amber)}
+.statsGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:640px;margin:20px auto}
+.stat{background:var(--panel);border:1px solid var(--line);padding:14px 8px}.stat small{display:block;color:var(--muted);font-family:"Share Tech Mono",monospace;font-size:10px;letter-spacing:.12em}.stat strong{display:block;font-size:22px;margin-top:6px}
+@media(max-width:640px){.statsGrid{grid-template-columns:1fr 1fr}}
+/* Learn */
+.screenHead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.chip{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:10px 16px;clip-path:var(--cut);font-family:"Chakra Petch"}
+.chip.sel{background:var(--neon);color:#02141c;border-color:#8ff7ff}
+.learnStats{display:flex;gap:14px;flex-wrap:wrap;font-family:"Share Tech Mono",monospace;font-size:12px;color:var(--muted);margin:10px 0}
+.learnStats strong{color:var(--text)}
+.learnProgWrap{height:10px;background:#050d1a;border:1px solid var(--line);overflow:hidden;margin-bottom:14px}
+#learnProg{height:100%;width:0;background:var(--green);transition:width .3s}
+.flipCard{perspective:1200px;cursor:pointer;max-width:640px;margin:0 auto}
+.flipInner{position:relative;min-height:380px;transition:transform .5s;transform-style:preserve-3d}
+.flipCard.flipped .flipInner{transform:rotateY(180deg)}
+.flipFace{position:absolute;inset:0;backface-visibility:hidden;border:1px solid var(--line);background:var(--panel);clip-path:var(--cut);padding:20px;text-align:center}
+.flipBack{transform:rotateY(180deg);overflow:auto}
+.lfTag{font-family:"Share Tech Mono",monospace;color:var(--neon);font-size:12px;letter-spacing:.14em}
+.flipFront img,.flipBack img{max-width:100%;max-height:220px;margin:12px auto;border:1px solid var(--line)}
+.lfQ{font-family:"Chakra Petch";font-size:18px}.lfCue{line-height:1.6;color:var(--text)}
+.tapHint{color:var(--muted);font-family:"Share Tech Mono",monospace;font-size:12px;margin-top:16px}
+.lbName{font-family:"Chakra Petch";font-size:22px}.lbUse{line-height:1.6;margin:10px 0}
+#learnPlay .btnRow{justify-content:center}
+.learnDone{display:none;text-align:center;border:1px solid var(--green);background:var(--panel);clip-path:var(--cut);padding:22px;margin:16px 0}
+.learnDone.on{display:block}
+/* Library */
+.search{width:100%;padding:13px;background:var(--panel);border:1px solid var(--line);color:var(--text);font:inherit;margin:6px 0}
+.libCount{font-family:"Share Tech Mono",monospace;color:var(--muted);font-size:12px}
+.libGrid{display:grid;gap:12px}.libCard,.noteCard{background:var(--panel);border:1px solid var(--line);clip-path:var(--cut);padding:14px;line-height:1.6}
+.libCard h3,.noteCard summary{font-family:"Chakra Petch";margin:0 0 6px;cursor:pointer}
+.libCard img{max-width:100%;max-height:240px;border:1px solid var(--line)}
+.pcCat{color:var(--neon);font-family:"Share Tech Mono",monospace;font-size:11px;letter-spacing:.14em}
+.textOnly{color:var(--muted);font-style:italic}
+.photoGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.photoCard{background:var(--panel);border:1px solid var(--line);clip-path:var(--cut);overflow:hidden}
+.photoCard img{width:100%;height:200px;object-fit:cover;display:block}.pcBody{padding:12px;line-height:1.55}.pcBody h4{margin:0 0 4px;font-family:"Chakra Petch"}
+.libPhotos{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}.libPhotos img{max-height:150px;border:1px solid var(--line)}
+/* Settings */
+.settingsCard{background:var(--panel);border:1px solid var(--line);clip-path:var(--cut);padding:18px;max-width:640px}
+.setRow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);font-family:"Chakra Petch"}
+.setRow select,.setRow input[type=checkbox]{accent-color:var(--neon)}
+.setRow select{background:#050d1a;color:var(--text);border:1px solid var(--line);padding:10px;font:inherit}
+.speedRow{display:flex;align-items:center;gap:10px}.speedRow strong{color:var(--neon);min-width:52px;text-align:right}
+.voiceStatus{color:var(--muted);line-height:1.6;font-size:14px}

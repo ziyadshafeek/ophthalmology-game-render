@@ -1,0 +1,8 @@
+# Render static site. Publish directory = this folder (index.html at root).
+# No build step: plain HTML/CSS/JS + JSON data + JPEG assets.
+services:
+  - type: web
+    name: ophthalmology-arena
+    env: static
+    buildCommand: ""
+    staticPublishPath: .

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="color-scheme" content="dark"/>
+<link rel="icon" href="data:,">
+<title>Ophthalmology — Instrument Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Sora:wght@400;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="bootScreen"><div class="bootBox">
+<div class="bootKicker">OPHTHALMO·OS // INSTRUMENT ARENA</div>
+<div id="bootLog" class="bootLog"></div>
+<div class="bootBarWrap"><div id="bootBar"></div></div>
+<div class="bootRow"><span id="bootPct">0%</span><button id="bootSkip" class="bootSkip">SKIP ▸</button></div>
+</div></div>
+
+<main class="wrap" id="mainWrap">
+<!-- ============ HOME: only 4 actions, one short line ============ -->
+<section id="homeScreen" class="screen on">
+<div class="hero">
+<div class="kicker">OPHTHALMO · INSTRUMENT ARENA</div>
+<h1 class="gameTitle">OPHTHALMO<br><span>INSTRUMENT</span> <em>ARENA</em></h1>
+<p class="oneLine">92 instruments · 3 levels · Learn Mode</p>
+<nav class="homeGrid" aria-label="Main menu">
+<button class="homeBtn primary" id="playBtn"><span class="hbIc">▶</span><span>Play</span></button>
+<button class="homeBtn" id="learnBtn"><span class="hbIc">🧠</span><span>Learn</span></button>
+<button class="homeBtn" id="libBtn"><span class="hbIc">📚</span><span>Library</span></button>
+<button class="homeBtn" id="settingsBtn"><span class="hbIc">⚙️</span><span>Settings</span></button>
+</nav>
+<p class="bestLine" id="bestLine"></p>
+</div>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="gameScreen" class="screen">
+<div id="hud" class="hud">
+<div class="hudTop">
+<div class="pill"><small>LEVEL</small><strong id="lvlVal">1 · ROOKIE</strong></div>
+<div class="pill"><small>SCORE</small><strong id="scoreVal">0</strong></div>
+<div class="pill" id="comboPill"><small>COMBO</small><strong><span id="comboVal">0</span> <span id="comboMult">×1</span></strong></div>
+<div class="pill"><small>LIVES</small><strong id="hearts" class="hearts"></strong></div>
+</div>
+<div class="timerWrap" id="timerWrap"><div id="timerBar"></div></div>
+<div class="hudRow"><span id="qCount">ROUND 1 / 8</span><span id="timerText">15.0s</span><button id="speakerBtn" class="iconBtn" aria-label="Read aloud">🔊</button></div>
+<div class="progressDots" id="dots"></div>
+<div class="powers" id="powers">
+<button class="pwBtn" id="pwFifty" aria-label="50:50">✂️ <span class="pwCount" id="cFifty">1</span></button>
+<button class="pwBtn" id="pwTime" aria-label="Add 5 seconds">⏱️ <span class="pwCount" id="cTime">1</span></button>
+<button class="pwBtn" id="pwShield" aria-label="Shield">🛡️ <span class="pwCount" id="cShield">1</span></button>
+<button class="pwBtn" id="pwHint" aria-label="Viva hint">💡 <span class="pwCount" id="cHint">1</span></button>
+</div>
+</div>
+<div id="arena" class="arena">
+<div id="photoStage" class="photoStage" style="display:none">
+<img id="photoImg" alt="" loading="lazy" decoding="async">
+<div id="photoCap" class="photoCap" style="display:none"></div>
+</div>
+<div class="qHead"><span id="qTag" class="tag"></span><span id="pointsTag" class="pointsTag"></span></div>
+<h2 id="qTitle"></h2>
+<p id="qClue" class="qClue"></p>
+<div id="hintBox" class="hintBox"></div>
+<div id="opts" class="opts"></div>
+<div id="feedback" class="feedback">
+<div id="fbTitle" class="fbTitle"></div>
+<div id="fbUse" class="fbUse"></div>
+<div id="fbFact" class="viva"></div>
+<div id="fbNote" class="yellowNote"></div>
+<details id="fbFull" class="fullDet"><summary id="fbFullSum"></summary><div id="fbFullBody" class="noteBody"></div></details>
+<div class="btnRow"><button class="btn primary" id="nextBtn">NEXT ▶</button><button class="btn ghost" id="replayRevealBtn">🔊 READ NOTE AGAIN</button></div>
+</div>
+<div class="btnRow"><button class="btn ghost" id="quitGameBtn">✕ QUIT TO HOME</button></div>
+</div>
+<div id="levelOverlay" class="overlay"><div class="overlayBox"><div class="kicker" id="lvlKick"></div><h2 id="lvlTitle"></h2><p id="lvlDesc"></p><p id="lvlBonus"></p></div></div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section id="resultsScreen" class="screen">
+<div class="resultBox">
+<div class="kicker" id="endKick">GAME OVER</div>
+<h2 id="endTitle"></h2>
+<p id="endDesc"></p>
+<p id="rankLine" class="rankLine"></p>
+<div class="statsGrid">
+<div class="stat"><small>FINAL SCORE</small><strong id="stScore">0</strong></div>
+<div class="stat"><small>BEST COMBO</small><strong id="stCombo">0</strong></div>
+<div class="stat"><small>ACCURACY</small><strong id="stAcc">0%</strong></div>
+<div class="stat"><small>ROUNDS</small><strong id="stRounds">0</strong></div>
+</div>
+<div class="btnRow"><button class="btn primary" id="againBtn">▶ PLAY AGAIN</button><button class="btn ghost" id="menuBtn">HOME</button></div>
+</div>
+</section>
+
+<!-- ============ LEARN ============ -->
+<section id="learnScreen" class="screen">
+<div class="screenHead"><h2>🧠 Learn</h2><button class="btn ghost" id="learnExit">✕ EXIT</button></div>
+<div class="chips" id="learnChips">
+<button class="chip sel" data-deck="all">All 92</button>
+<button class="chip" data-deck="quick">Quick 25</button>
+<button class="chip" data-deck="photo">Photos only</button>
+<button class="chip" data-deck="new">New 65–92</button>
+</div>
+<div class="learnStats">
+<span>MASTERED <strong id="lsMastered">0 / 92</strong></span>
+<span>IN ROTATION <strong id="lsRotation">92</strong></span>
+<span>REVIEWS <strong id="lsReviews">0</strong></span>
+<span>ACCURACY <strong id="lsAcc">—</strong></span>
+<span>NEXT <strong id="lsNext">—</strong></span>
+</div>
+<div class="learnProgWrap"><div id="learnProg"></div></div>
+<div id="learnPlay">
+<div id="flipCard" class="flipCard" tabindex="0" role="button" aria-label="Flip card">
+<div class="flipInner">
+<div class="flipFace flipFront">
+<div class="lfTag" id="lfTag"></div>
+<img id="lfImg" alt="" loading="lazy" decoding="async">
+<div class="lfQ" id="lfQ"></div>
+<p class="lfCue" id="lfCue"></p>
+<div class="tapHint">TAP TO FLIP ▸</div>
+</div>
+<div class="flipFace flipBack">
+<div class="lbName" id="lbName"></div>
+<div class="lbUse" id="lbUse"></div>
+<div class="yellowNote" id="lbNote"></div>
+</div>
+</div>
+</div>
+<div class="btnRow"><button class="btn ghost" id="learnSpeakerBtn">🔊 READ AGAIN</button></div>
+<div class="btnRow"><button class="btn bad" id="gradeMiss">✗ STILL LEARNING</button><button class="btn good" id="gradeGot">✓ GOT IT</button></div>
+</div>
+<div id="learnDone" class="learnDone"><h3>🏆 DECK MASTERED</h3><p id="learnDoneTxt"></p>
+<div class="btnRow"><button class="btn primary" id="learnAgain">↻ RUN IT AGAIN</button><button class="btn ghost" id="learnToGame">▶ GO TO THE GAME</button></div></div>
+</section>
+
+<!-- ============ LIBRARY ============ -->
+<section id="libraryScreen" class="screen">
+<div class="screenHead"><h2>📚 Library</h2><button class="btn ghost" id="libBack">✕ HOME</button></div>
+<input id="libSearch" class="search" type="search" placeholder="Search instruments…" aria-label="Search library">
+<div class="chips" id="libTabs">
+<button class="chip sel" data-tab="cards">Cards · 92</button>
+<button class="chip" data-tab="notes">Full notes · 55</button>
+<button class="chip" data-tab="photos">Photos · 64</button>
+</div>
+<p class="libCount" id="libCount"></p>
+<div id="libCards" class="libGrid"></div>
+<div id="libNotes" class="libGrid" style="display:none"></div>
+<div id="libPhotos" class="photoGrid" style="display:none"></div>
+</section>
+
+<!-- ============ SETTINGS (all voice/sound controls live here) ============ -->
+<section id="settingsScreen" class="screen">
+<div class="screenHead"><h2>⚙️ Settings</h2><button class="btn ghost" id="settingsBack">✕ HOME</button></div>
+<div class="settingsCard">
+<label class="setRow"><span>Voice mode</span>
+<select id="voiceMode">
+<option value="local">Local Piper</option>
+<option value="browser">Browser natural</option>
+<option value="off">Off</option>
+</select></label>
+<label class="setRow"><span>Auto-read</span><input type="checkbox" id="autoRead"></label>
+<label class="setRow"><span>Voice speed</span><span class="speedRow"><input type="range" id="voiceSpeed" min="0.7" max="1.2" step="0.05"><strong id="voiceSpeedVal"></strong></span></label>
+<label class="setRow"><span>Sounds</span><input type="checkbox" id="soundsOn"></label>
+<div class="setRow"><span>Mute voice</span><button class="btn ghost" id="muteBtn">🎙️ VOICE: ON</button></div>
+<p class="voiceStatus" id="voiceStatus"></p>
+</div>
+</section>
+</main>
+<script src="js/voice.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script src="js/game.js"></script>
+<script src="js/learn.js"></script>
+<script src="js/library.js"></script>
+</body>
+</html>
