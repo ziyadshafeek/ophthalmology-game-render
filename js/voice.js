@@ -6,14 +6,17 @@
    (Next / grade / screen change / mute / replay), never by a timer:
    the game timer is cleared during the answer reveal, so a reveal reading
    can never be cut off by the next round starting on its own.
-   PHONE RULE (added after speech buttons froze the page): Piper synthesis
-   runs on the phone CPU and can block the whole page while it crunches a
-   chunk, and Android Chrome's speech queue stalls if it is fed immediately
-   after a cancel. So on phones Piper is never downloaded or used at all —
-   the native browser voice reads the full note instead, which runs
-   off the main thread and cannot freeze taps. Piper stays available on
-   desktop. Every speech button is also a toggle: tap while it is reading
-   to stop it at once. */
+   PHONE RULE (revised after browser voice gave zero sound on the user's
+   phone, even on TEST VOICE): the phone's speechSynthesis engine cannot
+   be relied on at all, so local Piper MUST work on phones too. Piper
+   synthesis on the main thread blocks taps while it crunches a chunk,
+   which is why it was disabled on phones before — so on phones Piper
+   now runs in a Web Worker (js/piper-worker.js): the main thread only
+   posts text and receives audio blobs, taps stay responsive, and the
+   audio plays through a normal <audio> element, independent of the
+   phone's broken speech engine. If the worker fails, main-thread Piper
+   is tried as a fallback, then browser voice. Every speech button is
+   also a toggle: tap while it is reading to stop it at once. */
 (function () {
   'use strict';
   var DEFAULTS = { mode: 'local', autoRead: true, rate: 0.95, sounds: true, muted: false };
@@ -35,24 +38,85 @@
   var chosenVoice = null, voiceNatural = false, speaking = false;
   var isMobile = false;
   try { isMobile = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod/.test(navigator.userAgent || ''); } catch (e) {}
-  function usePiper() { return settings.mode !== 'browser' && settings.mode !== 'off' && !isMobile && !piper.slow && piper.state === 'ready' && !!piper.mod; }
+  function usePiper() {
+    if (settings.mode === 'browser' || settings.mode === 'off') return false;
+    if (isMobile) return wp.state === 'ready' || (wp.state === 'failed' && piper.state === 'ready' && !!piper.mod);
+    return !piper.slow && piper.state === 'ready' && !!piper.mod;
+  }
+  function piperLoading() {
+    if (settings.mode === 'browser' || settings.mode === 'off') return false;
+    if (isMobile) return wp.state === 'loading' || (wp.state === 'failed' && piper.state === 'loading');
+    return piper.state === 'loading';
+  }
   function setSpeaking(v) {
     speaking = !!v;
     try { document.dispatchEvent(new CustomEvent(v ? 'ophth-voice-start' : 'ophth-voice-end')); } catch (e) {}
   }
   function isSpeaking() { return speaking; }
 
-  function piperState() { return piper.state; }
-  function piperProgress() { return piper.state === 'ready' ? 1 : (piper.pct || 0); }
-  function initPiper() {
-    if (isMobile) return; /* phones use browser voice: see PHONE RULE above */
+  /* Worker Piper (phones): synthesis runs off the main thread. */
+  var wp = { state: 'idle', pct: 0, worker: null, token: 0, pending: {}, seq: 0 };
+  var pendingChunks = null, pendingTokens = null;
+  function piperState() {
+    if (isMobile) {
+      if (wp.state === 'failed' && piper.state !== 'idle') return piper.state;
+      return wp.state;
+    }
+    return piper.state;
+  }
+  function piperProgress() {
+    if (isMobile) {
+      if (wp.state === 'failed' && piper.state !== 'idle') return piper.state === 'ready' ? 1 : (piper.pct || 0);
+      return wp.state === 'ready' ? 1 : (wp.pct || 0);
+    }
+    return piper.state === 'ready' ? 1 : (piper.pct || 0);
+  }
+  function flushPending() {
+    if (!pendingChunks || !pendingTokens) return;
+    if (pendingTokens.st !== speechToken || pendingTokens.pt !== piper.token || pendingTokens.wt !== wp.token) { pendingChunks = null; pendingTokens = null; return; }
+    var chunks = pendingChunks; pendingChunks = null; pendingTokens = null;
+    piperSpeak(chunks);
+  }
+  function initPiperWorker() {
+    if (wp.state === 'loading' || wp.state === 'ready') return;
+    if (typeof Worker === 'undefined') { wp.state = 'failed'; initPiperMain(); return; }
+    wp.state = 'loading'; updateVoiceStatus();
+    try {
+      var w = new Worker('js/piper-worker.js', { type: 'module' });
+      wp.worker = w;
+      w.onmessage = function (ev) {
+        var d = ev.data || {};
+        if (d.type === 'progress') { wp.pct = d.pct || 0; updateVoiceStatus(); }
+        else if (d.type === 'ready') { wp.state = 'ready'; wp.pct = 1; updateVoiceStatus(); flushPending(); }
+        else if (d.type === 'failed') { wp.state = 'failed'; updateVoiceStatus(); initPiperMain(); }
+        else if (d.type === 'result') {
+          var p = wp.pending[d.id]; if (p) { delete wp.pending[d.id]; if (d.error) p.reject(new Error(d.error)); else p.resolve(d.blob); }
+        }
+      };
+      w.onerror = function () { if (wp.state !== 'ready') { wp.state = 'failed'; updateVoiceStatus(); initPiperMain(); } };
+      w.postMessage({ type: 'init' });
+    } catch (e) { wp.state = 'failed'; updateVoiceStatus(); initPiperMain(); }
+  }
+  function workerPredict(text) {
+    return new Promise(function (resolve, reject) {
+      if (!wp.worker || wp.state !== 'ready') { reject(new Error('worker not ready')); return; }
+      var id = ++wp.seq; wp.pending[id] = { resolve: resolve, reject: reject };
+      try { wp.worker.postMessage({ type: 'predict', id: id, text: text }); }
+      catch (e) { delete wp.pending[id]; reject(e); }
+    });
+  }
+  function initPiperMain() {
     if (piper.state === 'loading' || piper.state === 'ready') return;
     piper.state = 'loading';
     import('https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm').then(function (mod) {
       piper.mod = mod;
       return mod.download(PIPER_VOICE, function (pr) { if (pr && pr.total) piper.pct = Math.max(piper.pct, pr.loaded / pr.total); });
-    }).then(function () { piper.state = 'ready'; piper.pct = 1; updateVoiceStatus(); })
+    }).then(function () { piper.state = 'ready'; piper.pct = 1; updateVoiceStatus(); flushPending(); })
       .catch(function () { piper.state = 'failed'; updateVoiceStatus(); });
+  }
+  function initPiper() {
+    if (isMobile) initPiperWorker();
+    else initPiperMain();
   }
   function expandAbbr(t) {
     return t
@@ -101,8 +165,11 @@
       if (tok !== piper.token || settings.muted || i >= chunks.length) { setSpeaking(false); return; }
       var tx = expandAbbr(chunks[i++]), advanced = false, watchdog = null;
       function adv() { if (advanced) return; advanced = true; if (watchdog) clearTimeout(watchdog); next(); }
-      watchdog = setTimeout(function () { piper.slow = true; adv(); }, chunkBudgetMs(tx));
-      piper.mod.predict({ text: tx, voiceId: PIPER_VOICE }).then(function (blob) {
+      watchdog = setTimeout(function () { if (!isMobile) piper.slow = true; adv(); }, chunkBudgetMs(tx));
+      var predictP = (isMobile && wp.state === 'ready')
+        ? workerPredict(tx)
+        : piper.mod.predict({ text: tx, voiceId: PIPER_VOICE });
+      predictP.then(function (blob) {
         if (tok !== piper.token) { adv(); return; }
         var url = URL.createObjectURL(blob), a = new Audio();
         piper.audio = a; a.src = url;
@@ -161,9 +228,19 @@
     if (!chunks.length) return;
     stopSpeak();
     var st = speechToken, pt = piper.token;
+    var wt = wp.token;
     setTimeout(function () {
-      if (st !== speechToken || pt !== piper.token || settings.muted || settings.mode === 'off') return;
+      if (st !== speechToken || pt !== piper.token || wt !== wp.token || settings.muted || settings.mode === 'off') return;
       if (usePiper()) piperSpeak(chunks);
+      else if (piperLoading()) {
+        /* Local model is still downloading — queue this reading and
+           speak it the moment the model is ready, instead of falling
+           back to a browser voice that produces zero sound on this
+           phone. stopSpeak() clears the queue, so a moved-on question
+           never speaks stale text. */
+        pendingChunks = chunks; pendingTokens = { st: speechToken, pt: piper.token, wt: wp.token };
+        setSpeaking(false);
+      }
       else if (ttsOK) browserSpeak(chunks);
     }, 150);
   }
@@ -191,6 +268,8 @@
       }
       speechToken++;
       piper.token++;
+      wp.token++;
+      pendingChunks = null; pendingTokens = null;
       if (piper.audio) { try { piper.audio.pause(); } catch (e) {} piper.audio = null; }
     } catch (e) {}
   }
@@ -215,7 +294,14 @@
   }
   function voiceStatusText() {
     if (settings.mode === 'off') return 'Voice is off. Turn it on in Voice mode to hear notes read aloud.';
-    if (isMobile && settings.mode !== 'browser') return 'Reading voice: browser voice on this phone — the local neural model runs on the phone CPU and can freeze the page, so it is only used on desktop. The full note is still read aloud, in full.';
+    if (isMobile && settings.mode !== 'browser') {
+      if (wp.state === 'ready') return 'Reading voice: local neural model (Piper · Amy, en-US) — generated on this device, works offline. Synthesis runs in a worker, so taps stay responsive.';
+      if (wp.state === 'loading') return 'Local voice is loading on this phone… ' + Math.round((wp.pct || 0) * 100) + '%. Tap TEST VOICE and it will speak once loading finishes — this download happens once.';
+      if (wp.state === 'failed' && piper.state === 'ready') return 'Reading voice: local neural model (Piper · Amy, en-US) — worker failed, main-thread model is used instead.';
+      if (wp.state === 'failed' && piper.state === 'failed') return 'Local voice failed to load on this phone — browser voice is used instead, which may be silent on this device. Reopen the page to retry the download.';
+      if (wp.state === 'failed') return 'Local voice worker failed — trying the main-thread model…';
+      return 'Local voice is starting on this phone…';
+    }
     if (settings.mode !== 'browser' && piper.state === 'ready') return 'Reading voice: local neural model (Piper · Amy, en-US) — generated on this device, works offline.';
     if (settings.mode !== 'browser' && piper.state === 'loading') return 'Reading voice: local neural model is initialising — browser voice is used until it is ready.';
     if (!ttsOK) return 'This browser has no text-to-speech, so notes cannot be read aloud on this device.';

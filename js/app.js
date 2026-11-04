@@ -67,7 +67,7 @@
         if (st === 'ready' || st === 'failed' || st === 'idle' || Date.now() - t0 > 5000) {
           clearInterval(iv);
           var bl = document.getElementById('bootVoiceLine');
-          if (bl) bl.textContent = (st === 'ready') ? 'local neural core · ONLINE' : 'browser voice core · ONLINE';
+          if (bl) bl.textContent = (st === 'ready') ? 'local neural core · ONLINE' : 'voice core · ONLINE';
           setTimeout(step, reduced ? 30 : 330);
         }
       }, 200);
@@ -130,7 +130,11 @@
     try { if (!('speechSynthesis' in window)) { var w = $('voiceWarn'); if (w) w.style.display = 'block'; } } catch (e) {}
     $('settingsBtn').onclick = function () { OphthAudio.sfx('click'); showScreen('settingsScreen'); syncSettingsUI(); };
     $('settingsBack').onclick = function () { goHome(); };
-    $('voiceMode').onchange = function () { OphthSettings.mode = this.value; saveOphthSettings(); OphthVoice.updateVoiceStatus(); };
+    $('voiceMode').onchange = function () {
+      OphthSettings.mode = this.value; saveOphthSettings();
+      if (this.value === 'local') { try { OphthVoice.initPiper(); } catch (e) {} }
+      OphthVoice.updateVoiceStatus();
+    };
     $('autoRead').onchange = function () { OphthSettings.autoRead = this.checked; saveOphthSettings(); if (!this.checked) OphthVoice.stopSpeak(); };
     $('voiceSpeed').oninput = function () { OphthSettings.rate = parseFloat(this.value); saveOphthSettings(); $('voiceSpeedVal').textContent = OphthSettings.rate.toFixed(2).replace(/0$/, '') + '×'; };
     $('soundsOn').onchange = function () { OphthSettings.sounds = this.checked; saveOphthSettings(); if (this.checked) OphthAudio.sfx('click'); };
@@ -144,10 +148,15 @@
          allowed to speak — if this is silent, the problem is the phone's
          media volume or speech engine, not auto-read timing. Unmutes
          first so the test always makes a sound when the engine works. */
-      if (OphthSettings.muted || OphthSettings.mode === 'off' || !OphthSettings.autoRead) {
-        OphthSettings.muted = false; OphthSettings.mode = 'browser'; OphthSettings.autoRead = true;
+      /* TEST VOICE must use the LOCAL model: the phone's browser voice
+         gives zero sound even on this test, so forcing 'browser' here
+         would guarantee silence. Force local, start the download if it
+         has not started, and speak (or queue until the model is ready). */
+      if (OphthSettings.muted || OphthSettings.mode === 'off' || !OphthSettings.autoRead || OphthSettings.mode !== 'local') {
+        OphthSettings.muted = false; OphthSettings.mode = 'local'; OphthSettings.autoRead = true;
         saveOphthSettings(); syncSettingsUI();
       }
+      try { OphthVoice.initPiper(); } catch (e) {}
       try { OphthVoice.prime(); } catch (e) {}
       try { OphthVoice.speakFullText('Voice test. This is the ophthalmology arena voice. If you can hear this, voice is working.'); } catch (e) {}
     };
