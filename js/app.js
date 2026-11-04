@@ -64,7 +64,7 @@
         var st = OphthVoice.piperState(), p = OphthVoice.piperProgress();
         var w = Math.round(68 + 14 * (st === 'ready' ? 1 : p));
         bar.style.width = w + '%'; pct.textContent = w + '%';
-        if (st === 'ready' || st === 'failed' || Date.now() - t0 > 5000) {
+        if (st === 'ready' || st === 'failed' || st === 'idle' || Date.now() - t0 > 5000) {
           clearInterval(iv);
           var bl = document.getElementById('bootVoiceLine');
           if (bl) bl.textContent = (st === 'ready') ? 'local neural core · ONLINE' : 'browser voice core · ONLINE';

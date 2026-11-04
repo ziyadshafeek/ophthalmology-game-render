@@ -124,8 +124,11 @@
     $('gradeGot').onclick = function () { grade(true); };
     $('learnSpeakerBtn').onclick = function () {
       if (!L || !L.cur) return;
-      if (L.flipped) OphthVoice.speakFullText(backText(L.cur.v));
-      else OphthVoice.speakFullText('Flashcard. ' + L.cur.v.q + ' Name the instrument, and say what it is used for.');
+      try { if (OphthVoice.isSpeaking && OphthVoice.isSpeaking()) { OphthVoice.stopSpeak(); return; } } catch (e) {}
+      try {
+        if (L.flipped) OphthVoice.speakFullText(backText(L.cur.v));
+        else OphthVoice.speakFullText('Flashcard. ' + L.cur.v.q + ' Name the instrument, and say what it is used for.');
+      } catch (e2) {}
     };
     $('learnChips').addEventListener('click', function (e) {
       var b = e.target.closest('.chip'); if (!b) return;

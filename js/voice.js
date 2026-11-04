@@ -5,7 +5,15 @@
    the last sentence ends. stopSpeak() is only called on a user tap
    (Next / grade / screen change / mute / replay), never by a timer:
    the game timer is cleared during the answer reveal, so a reveal reading
-   can never be cut off by the next round starting on its own. */
+   can never be cut off by the next round starting on its own.
+   PHONE RULE (added after speech buttons froze the page): Piper synthesis
+   runs on the phone CPU and can block the whole page while it crunches a
+   chunk, and Android Chrome's speech queue stalls if it is fed immediately
+   after a cancel. So on phones Piper is never downloaded or used at all —
+   the native browser voice reads the full note instead, which runs
+   off the main thread and cannot freeze taps. Piper stays available on
+   desktop. Every speech button is also a toggle: tap while it is reading
+   to stop it at once. */
 (function () {
   'use strict';
   var DEFAULTS = { mode: 'local', autoRead: true, rate: 0.95, sounds: true, muted: false };
@@ -22,13 +30,22 @@
   window.saveOphthSettings = saveSettings;
 
   var PIPER_VOICE = 'en_US-amy-low';
-  var piper = { state: 'idle', pct: 0, mod: null, token: 0, audio: null };
+  var piper = { state: 'idle', pct: 0, mod: null, token: 0, audio: null, slow: false };
   var ttsOK = ('speechSynthesis' in window);
-  var chosenVoice = null, voiceNatural = false;
+  var chosenVoice = null, voiceNatural = false, speaking = false;
+  var isMobile = false;
+  try { isMobile = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod/.test(navigator.userAgent || ''); } catch (e) {}
+  function usePiper() { return settings.mode !== 'browser' && settings.mode !== 'off' && !isMobile && !piper.slow && piper.state === 'ready' && !!piper.mod; }
+  function setSpeaking(v) {
+    speaking = !!v;
+    if (!v) { try { document.dispatchEvent(new CustomEvent('ophth-voice-end')); } catch (e) {} }
+  }
+  function isSpeaking() { return speaking; }
 
   function piperState() { return piper.state; }
   function piperProgress() { return piper.state === 'ready' ? 1 : (piper.pct || 0); }
   function initPiper() {
+    if (isMobile) return; /* phones use browser voice: see PHONE RULE above */
     if (piper.state === 'loading' || piper.state === 'ready') return;
     piper.state = 'loading';
     import('https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm').then(function (mod) {
@@ -66,7 +83,7 @@
     sentences = sentences.map(function (s) { return s.trim(); }).filter(Boolean);
     var chunks = [], cur = '';
     sentences.forEach(function (s) {
-      if (cur && (cur + ' ' + s).length > 240) { chunks.push(cur); cur = s; }
+      if (cur && (cur + ' ' + s).length > 200) { chunks.push(cur); cur = s; }
       else cur = cur ? (cur + ' ' + s) : s;
     });
     if (cur) chunks.push(cur);
@@ -79,12 +96,12 @@
      next chunk instead of leaving the game apparently frozen. */
   function chunkBudgetMs(text) { return Math.max(25000, Math.min(90000, text.length * 180)); }
   function piperSpeak(chunks) {
-    var tok = ++piper.token, i = 0;
+    var tok = ++piper.token, i = 0; setSpeaking(true);
     (function next() {
-      if (tok !== piper.token || settings.muted || i >= chunks.length) return;
+      if (tok !== piper.token || settings.muted || i >= chunks.length) { setSpeaking(false); return; }
       var tx = expandAbbr(chunks[i++]), advanced = false, watchdog = null;
       function adv() { if (advanced) return; advanced = true; if (watchdog) clearTimeout(watchdog); next(); }
-      watchdog = setTimeout(adv, chunkBudgetMs(tx));
+      watchdog = setTimeout(function () { piper.slow = true; adv(); }, chunkBudgetMs(tx));
       piper.mod.predict({ text: tx, voiceId: PIPER_VOICE }).then(function (blob) {
         if (tok !== piper.token) { adv(); return; }
         var url = URL.createObjectURL(blob), a = new Audio();
@@ -99,7 +116,7 @@
   var speechToken = 0;
   function browserSpeak(chunks) {
     if (!ttsOK) return;
-    var tok = ++speechToken, i = 0, keepAlive = null;
+    var tok = ++speechToken, i = 0, keepAlive = null; setSpeaking(true);
     /* Android Chrome can pause the speech queue when the page loses focus
        for a moment; a periodic resume keeps it moving without user taps. */
     keepAlive = setInterval(function () {
@@ -107,39 +124,56 @@
       try { if (speechSynthesis.paused) speechSynthesis.resume(); } catch (e) {}
     }, 1000);
     (function next() {
-      if (tok !== speechToken || settings.muted || i >= chunks.length) { if (i >= chunks.length) clearInterval(keepAlive); return; }
+      if (tok !== speechToken || settings.muted || i >= chunks.length) { if (keepAlive) clearInterval(keepAlive); setSpeaking(false); return; }
       var spoken = expandAbbr(chunks[i++]), advanced = false, watchdog = null;
       function adv() { if (advanced) return; advanced = true; if (watchdog) clearTimeout(watchdog); next(); }
       var u = new SpeechSynthesisUtterance(spoken);
       if (chosenVoice) { u.voice = chosenVoice; u.lang = chosenVoice.lang; } else u.lang = 'en-IN';
       u.rate = settings.rate; u.pitch = 1;
       u.onend = adv; u.onerror = adv;
-      watchdog = setTimeout(adv, chunkBudgetMs(spoken));
+      /* Watchdog: kill the stuck utterance first, then move on — otherwise
+         Android Chrome queues the next chunk behind a dead one and the
+         voice runs minutes behind the game, or never at all. */
+      watchdog = setTimeout(function () { try { speechSynthesis.cancel(); } catch (e) {} adv(); }, chunkBudgetMs(spoken));
       try { speechSynthesis.speak(u); } catch (e) { adv(); }
     })();
+  }
+  /* Start a chunk chain after a short settle: Android Chrome stalls if a
+     new utterance is fed in the same instant as a cancel. The token guard
+     means a NEXT / mute / screen-change tap in that 150 ms still wins and
+     no stale speech starts over the next question. */
+  function startChunks(chunks) {
+    if (!chunks.length) return;
+    stopSpeak();
+    var st = speechToken, pt = piper.token;
+    setTimeout(function () {
+      if (st !== speechToken || pt !== piper.token || settings.muted || settings.mode === 'off') return;
+      if (usePiper()) piperSpeak(chunks);
+      else if (ttsOK) browserSpeak(chunks);
+    }, 150);
   }
   /* Speak a whole text, fully, in the active voice mode. */
   function speakFullText(text) {
     if (settings.muted || settings.mode === 'off') return;
-    var chunks = splitFull(text);
-    if (!chunks.length) return;
-    stopSpeak();
-    if (settings.mode !== 'browser' && piper.state === 'ready' && piper.mod) piperSpeak(chunks);
-    else if (ttsOK) browserSpeak(chunks);
+    startChunks(splitFull(text));
   }
   /* Speak an explicit list of texts, fully, in order (used for questions). */
   function speakTexts(texts) {
     if (settings.muted || settings.mode === 'off' || !texts || !texts.length) return;
     var chunks = [];
     texts.forEach(function (t) { splitFull(t).forEach(function (c) { chunks.push(c); }); });
-    if (!chunks.length) return;
-    stopSpeak();
-    if (settings.mode !== 'browser' && piper.state === 'ready' && piper.mod) piperSpeak(chunks);
-    else if (ttsOK) browserSpeak(chunks);
+    startChunks(chunks);
   }
   function stopSpeak() {
     try {
-      if (ttsOK) { try { speechSynthesis.cancel(); } catch (e) {} }
+      setSpeaking(false);
+      if (ttsOK) {
+        try { speechSynthesis.cancel(); } catch (e) {}
+        /* Flush a stuck Android queue: cancel alone sometimes leaves the
+           engine believing it is still speaking. */
+        try { speechSynthesis.pause(); } catch (e2) {}
+        try { speechSynthesis.resume(); } catch (e3) {}
+      }
       speechToken++;
       piper.token++;
       if (piper.audio) { try { piper.audio.pause(); } catch (e) {} piper.audio = null; }
@@ -166,6 +200,7 @@
   }
   function voiceStatusText() {
     if (settings.mode === 'off') return 'Voice is off. Turn it on in Voice mode to hear notes read aloud.';
+    if (isMobile && settings.mode !== 'browser') return 'Reading voice: browser voice on this phone — the local neural model runs on the phone CPU and can freeze the page, so it is only used on desktop. The full note is still read aloud, in full.';
     if (settings.mode !== 'browser' && piper.state === 'ready') return 'Reading voice: local neural model (Piper · Amy, en-US) — generated on this device, works offline.';
     if (settings.mode !== 'browser' && piper.state === 'loading') return 'Reading voice: local neural model is initialising — browser voice is used until it is ready.';
     if (!ttsOK) return 'This browser has no text-to-speech, so notes cannot be read aloud on this device.';
@@ -179,7 +214,7 @@
   }
   window.OphthVoice = {
     settings: settings, saveSettings: saveSettings, initPiper: initPiper, piperState: piperState, piperProgress: piperProgress,
-    splitFull: splitFull, speakFullText: speakFullText, speakTexts: speakTexts, stopSpeak: stopSpeak,
+    splitFull: splitFull, speakFullText: speakFullText, speakTexts: speakTexts, stopSpeak: stopSpeak, isSpeaking: isSpeaking,
     updateVoiceStatus: updateVoiceStatus, voiceStatusText: voiceStatusText
   };
   initPiper();

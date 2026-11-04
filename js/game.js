@@ -123,6 +123,7 @@
   }
   function showQuestion() {
     try { OphthVoice.stopSpeak(); } catch (e) {}
+    try { var sb = $('speakerBtn'); if (sb) sb.textContent = '🔊'; } catch (e2) {}
     G.locked = false; revealed = false;
     var q = curQ(), it = q.item, L = DATA.levels[G.level];
     $('hintBox').classList.remove('on');
@@ -384,12 +385,21 @@
     $('menuBtn').onclick = function () { OphthHome(); };
     $('quitGameBtn').onclick = function () { try { OphthVoice.stopSpeak(); } catch (e) {} OphthHome(); };
     $('nextBtn').onclick = nextRound;
-    $('replayRevealBtn').onclick = function () { if (lastRevealText) { try { OphthVoice.speakFullText(lastRevealText); } catch (e) {} } };
-    $('speakerBtn').onclick = function () {
-      if (revealed && lastRevealText) OphthVoice.speakFullText(lastRevealText);
-      else if (G && !G.locked) speakRound();
-      else if (G) speakRound();
+    $('replayRevealBtn').onclick = function () {
+      try { if (OphthVoice.isSpeaking && OphthVoice.isSpeaking()) { OphthVoice.stopSpeak(); return; } } catch (e) {}
+      if (lastRevealText) { try { OphthVoice.speakFullText(lastRevealText); } catch (e2) {} }
     };
+    $('speakerBtn').onclick = function () {
+      /* Speech button is a toggle: tap while it is reading to stop it at
+         once, instead of stacking another full reading on top. */
+      try { if (OphthVoice.isSpeaking && OphthVoice.isSpeaking()) { OphthVoice.stopSpeak(); $('speakerBtn').textContent = '🔊'; return; } } catch (e) {}
+      try {
+        if (revealed && lastRevealText) OphthVoice.speakFullText(lastRevealText);
+        else if (G) speakRound();
+        $('speakerBtn').textContent = '⏹️';
+      } catch (e2) {}
+    };
+    document.addEventListener('ophth-voice-end', function () { var b = $('speakerBtn'); if (b) b.textContent = '🔊'; });
     $('pwFifty').onclick = function () {
       if (!G || G.locked || G.pw.fifty <= 0) return;
       G.pw.fifty--; OphthAudio.sfx('power');
