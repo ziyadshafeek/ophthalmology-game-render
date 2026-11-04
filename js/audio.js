@@ -44,5 +44,31 @@
       if (k === 'tick') tone(1050, 0, .05, 'square', .06);
     } catch (e) {}
   }
-  window.OphthAudio = { ac: ac, sfx: sfx };
+  /* Long sound test: ignores the Sounds setting entirely (a test that
+     respects the setting it is testing would be silent exactly when
+     the setting is off — the diagnostic bug in v11/v12). Plays a loud
+     scale, repeating for 5 seconds, so the user has time to press
+     volume-up DURING the sound: on Android, volume buttons only
+     change media volume while media is playing, so a 0.4-second beep
+     is over before the user can raise it. */
+  function testSound() {
+    try {
+      var c = ac(); if (!c || c.state === 'closed') return;
+      var notes = [523, 659, 784, 1046, 784, 659, 523];
+      var start = c.currentTime + 0.05, i = 0;
+      function one() {
+        if (i >= notes.length * 2) return;
+        var f = notes[i % notes.length];
+        var o = c.createOscillator(), g = c.createGain();
+        o.type = 'square'; o.frequency.value = f;
+        g.gain.setValueAtTime(.18, c.currentTime);
+        g.gain.exponentialRampToValueAtTime(.001, c.currentTime + .35);
+        o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime + .35);
+        i++;
+        setTimeout(one, 450);
+      }
+      one();
+    } catch (e) {}
+  }
+  window.OphthAudio = { ac: ac, sfx: sfx, testSound: testSound };
 })();

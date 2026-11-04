@@ -148,7 +148,7 @@
          beep is heard, the phone's audio output works and the problem
          is voice-only. If this beep is silent, the problem is the
          phone / browser / site sound, not the voice engine. */
-      try { OphthAudio.ac(); OphthAudio.sfx('win'); } catch (e) {}
+      try { if (OphthAudio.testSound) OphthAudio.testSound(); else { OphthAudio.ac(); OphthAudio.sfx('win'); } } catch (e) {}
     };
     $('resetSoundBtn').onclick = function () {
       OphthSettings.sounds = true; OphthSettings.muted = false;
