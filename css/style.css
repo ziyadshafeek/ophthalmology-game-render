@@ -1,8 +1,10 @@
 :root{--bg:#020610;--panel:#071120;--panel2:#0a1830;--line:#1d3a5f;--text:#e8f6ff;--muted:#8fb4d8;--cyan:#00e5ff;--amber:#ffb300;--yellow:#fef08a;--red:#ff2e63;--green:#2effa8;--orange:#ff7a18;--mag:#ff2ea6;--violet:#8b5cf6;--neon:#00f0ff;--cut:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Sora,system-ui,sans-serif;overflow-x:hidden}
-body{background-image:radial-gradient(760px 430px at 12% -5%,rgba(0,240,255,.16),transparent 60%),radial-gradient(720px 420px at 92% 0%,rgba(255,46,166,.10),transparent 60%),linear-gradient(rgba(0,240,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.05) 1px,transparent 1px);background-size:auto,auto,34px 34px,34px 34px;min-height:100dvh}
-button{font:inherit;cursor:pointer}button:focus-visible{outline:2px solid var(--neon);outline-offset:2px}button:disabled{opacity:.4;cursor:default}
-.wrap{max-width:980px;margin:0 auto;padding:14px 14px 40px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Sora,system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden}
+html{height:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background-image:radial-gradient(760px 430px at 12% -5%,rgba(0,240,255,.16),transparent 60%),radial-gradient(720px 420px at 92% 0%,rgba(255,46,166,.10),transparent 60%),linear-gradient(rgba(0,240,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.05) 1px,transparent 1px);background-size:auto,auto,34px 34px,34px 34px;min-height:100vh;min-height:100dvh}
+button{font:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}button:focus-visible{outline:2px solid var(--neon);outline-offset:2px}button:disabled{opacity:.4;cursor:default}
+input,select{font-size:16px}
+.wrap{max-width:980px;margin:0 auto;padding:14px 14px calc(40px + env(safe-area-inset-bottom,0px));padding-left:calc(14px + env(safe-area-inset-left,0px));padding-right:calc(14px + env(safe-area-inset-right,0px))}
 .screen{display:none}.screen.on{display:block}
 .kicker{font-family:"Share Tech Mono",ui-monospace,monospace;letter-spacing:.28em;font-size:11px;color:var(--neon);text-shadow:0 0 12px rgba(0,240,255,.6)}
 /* Boot: the ONLY loading UI. Voice-model load stays hidden inside it. */
@@ -52,6 +54,12 @@ h2{font-family:"Chakra Petch"}.qClue{color:var(--text);line-height:1.6;font-size
 .opt .key{font-family:"Chakra Petch";color:var(--neon);border:1px solid var(--line);padding:4px 9px;flex:none}
 .feedback{display:none;border:1px solid var(--line);background:var(--panel);clip-path:var(--cut);padding:16px;margin:14px 0;line-height:1.6}
 .feedback.on{display:block}.feedback.good{border-color:var(--green)}.feedback.bad{border-color:var(--red)}
+/* The answer actions must stay reachable on a phone: NEXT sticks to the
+   bottom of the viewport while the player reads the note, instead of
+   sitting below the fold where it looked like the game had frozen. */
+.feedback.on .btnRow{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom,0px));background:var(--panel);padding:12px 0 4px;z-index:5}
+.centerRow{justify-content:center}
+.hudBtns{display:flex;gap:8px}
 .fbTitle{font-family:"Chakra Petch";font-size:18px}.fbUse{margin:8px 0}
 .viva{background:rgba(0,240,255,.07);border-left:3px solid var(--neon);padding:10px;margin:10px 0}
 .yellowNote{background:var(--yellow);color:#111;padding:12px;margin:10px 0;line-height:1.65;border:1px solid #d4b800}
@@ -68,7 +76,22 @@ h2{font-family:"Chakra Petch"}.qClue{color:var(--text);line-height:1.6;font-size
 .resultBox{text-align:center;padding:30px 10px}.rankLine{font-family:"Chakra Petch";font-size:20px;color:var(--amber)}
 .statsGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:640px;margin:20px auto}
 .stat{background:var(--panel);border:1px solid var(--line);padding:14px 8px}.stat small{display:block;color:var(--muted);font-family:"Share Tech Mono",monospace;font-size:10px;letter-spacing:.12em}.stat strong{display:block;font-size:22px;margin-top:6px}
-@media(max-width:640px){.statsGrid{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){
+.statsGrid{grid-template-columns:1fr 1fr}
+.wrap{padding-top:10px}
+h1.gameTitle{font-size:clamp(34px,11vw,56px)}
+.homeBtn{padding:18px 10px;font-size:18px}
+.pill{padding:7px 10px}.pill strong{font-size:16px}
+.photoStage img{max-height:38dvh}
+.qClue{font-size:15px}
+.opt{min-height:56px;padding:16px 14px;font-size:16px;overflow-wrap:anywhere}
+.btn{min-height:48px;padding:14px 18px}
+.btnRow{gap:12px}
+.flipInner{min-height:320px}
+.libGrid{grid-template-columns:1fr}
+.photoGrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.photoCard img{height:140px}
+}
 /* Learn */
 .screenHead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}

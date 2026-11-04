@@ -54,12 +54,16 @@
       appendLine(li); li++; setTimeout(step, reduced ? 30 : 330);
     }
     function waitVoice() {
+      /* The boot screen must never hold the game hostage on a slow phone:
+         wait at most ~5 seconds for the local voice model, then go in
+         anyway — the model keeps loading in the background and the browser
+         voice covers until it is ready. */
       var iv = setInterval(function () {
         if (bootDone) { clearInterval(iv); return; }
         var st = OphthVoice.piperState(), p = OphthVoice.piperProgress();
         var w = Math.round(68 + 14 * (st === 'ready' ? 1 : p));
         bar.style.width = w + '%'; pct.textContent = w + '%';
-        if (st === 'ready' || st === 'failed' || Date.now() - t0 > 25000) {
+        if (st === 'ready' || st === 'failed' || Date.now() - t0 > 5000) {
           clearInterval(iv);
           var bl = document.getElementById('bootVoiceLine');
           if (bl) bl.textContent = (st === 'ready') ? 'local neural core · ONLINE' : 'browser voice core · ONLINE';
@@ -68,7 +72,7 @@
       }, 200);
     }
     setTimeout(step, 120);
-    setTimeout(finishBoot, 30000);
+    setTimeout(finishBoot, 8000);
   })();
 
   /* ---------- Home + Settings wiring ---------- */
@@ -82,7 +86,45 @@
     $('muteBtn').textContent = st.muted ? '🔇 VOICE: OFF' : '🎙️ VOICE: ON';
     OphthVoice.updateVoiceStatus();
   }
+  /* Fullscreen toggle, cross-browser: standard API plus webkit/moz/ms
+     fallbacks. On iOS Safari there is no element fullscreen API, so the
+     button there scrolls to the top and lets the browser chrome collapse;
+     true fullscreen on iPhone comes from Add to Home Screen (the meta tags
+     in index.html declare the app capable of that). */
+  function fsEl() { return document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null; }
+  function toggleFullscreen() {
+    try {
+      if (fsEl()) {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+        else if (document.msExitFullscreen) document.msExitFullscreen();
+      } else {
+        var el = document.documentElement;
+        if (el.requestFullscreen) { var p = el.requestFullscreen(); if (p && p.catch) p.catch(function () {}); }
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+        else if (el.msRequestFullscreen) el.msRequestFullscreen();
+        else window.scrollTo(0, 0);
+      }
+    } catch (e) {}
+    syncFsButtons();
+  }
+  function syncFsButtons() {
+    var on = !!fsEl();
+    ['fsBtnHome', 'fsBtnGame'].forEach(function (id) {
+      var b = $(id); if (b) b.textContent = on ? '⛶ EXIT FULLSCREEN' : '⛶ FULL SCREEN';
+    });
+  }
+  document.addEventListener('fullscreenchange', syncFsButtons);
+  document.addEventListener('webkitfullscreenchange', syncFsButtons);
+  document.addEventListener('mozfullscreenchange', syncFsButtons);
+  document.addEventListener('MSFullscreenChange', syncFsButtons);
   document.addEventListener('DOMContentLoaded', function () {
+    syncFsButtons();
+    ['fsBtnHome', 'fsBtnGame'].forEach(function (id) {
+      var b = $(id); if (b) b.onclick = function () { OphthAudio.sfx('click'); toggleFullscreen(); };
+    });
     syncSettingsUI();
     $('settingsBtn').onclick = function () { OphthAudio.sfx('click'); showScreen('settingsScreen'); syncSettingsUI(); };
     $('settingsBack').onclick = function () { goHome(); };

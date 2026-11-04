@@ -4,6 +4,12 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="color-scheme" content="dark"/>
+<meta name="theme-color" content="#020610"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Ophthalmo Arena"/>
+<link rel="manifest" href="manifest.webmanifest"/>
 <link rel="icon" href="data:,">
 <title>Ophthalmology — Instrument Arena</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,6 +38,7 @@
 <button class="homeBtn" id="settingsBtn"><span class="hbIc">⚙️</span><span>Settings</span></button>
 </nav>
 <p class="bestLine" id="bestLine"></p>
+<div class="btnRow centerRow"><button class="btn ghost" id="fsBtnHome">⛶ FULL SCREEN</button></div>
 </div>
 </section>
 
@@ -45,7 +52,7 @@
 <div class="pill"><small>LIVES</small><strong id="hearts" class="hearts"></strong></div>
 </div>
 <div class="timerWrap" id="timerWrap"><div id="timerBar"></div></div>
-<div class="hudRow"><span id="qCount">ROUND 1 / 8</span><span id="timerText">15.0s</span><button id="speakerBtn" class="iconBtn" aria-label="Read aloud">🔊</button></div>
+<div class="hudRow"><span id="qCount">ROUND 1 / 8</span><span id="timerText">15.0s</span><span class="hudBtns"><button id="fsBtnGame" class="iconBtn" aria-label="Fullscreen">⛶</button><button id="speakerBtn" class="iconBtn" aria-label="Read aloud">🔊</button></span></div>
 <div class="progressDots" id="dots"></div>
 <div class="powers" id="powers">
 <button class="pwBtn" id="pwFifty" aria-label="50:50">✂️ <span class="pwCount" id="cFifty">1</span></button>

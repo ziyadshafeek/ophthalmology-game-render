@@ -72,12 +72,19 @@
     if (cur) chunks.push(cur);
     return chunks;
   }
+  /* Watchdog: a voice chunk must never stall the chain forever. Some mobile
+     browsers (notably Android Chrome) sometimes never fire onend for a
+     speech utterance, and a Piper synthesis can hang on a slow network.
+     If a chunk has not finished within its generous budget, move on to the
+     next chunk instead of leaving the game apparently frozen. */
+  function chunkBudgetMs(text) { return Math.max(25000, Math.min(90000, text.length * 180)); }
   function piperSpeak(chunks) {
     var tok = ++piper.token, i = 0;
     (function next() {
       if (tok !== piper.token || settings.muted || i >= chunks.length) return;
-      var tx = expandAbbr(chunks[i++]), advanced = false;
-      function adv() { if (advanced) return; advanced = true; next(); }
+      var tx = expandAbbr(chunks[i++]), advanced = false, watchdog = null;
+      function adv() { if (advanced) return; advanced = true; if (watchdog) clearTimeout(watchdog); next(); }
+      watchdog = setTimeout(adv, chunkBudgetMs(tx));
       piper.mod.predict({ text: tx, voiceId: PIPER_VOICE }).then(function (blob) {
         if (tok !== piper.token) { adv(); return; }
         var url = URL.createObjectURL(blob), a = new Audio();
@@ -92,14 +99,23 @@
   var speechToken = 0;
   function browserSpeak(chunks) {
     if (!ttsOK) return;
-    var tok = ++speechToken, i = 0;
+    var tok = ++speechToken, i = 0, keepAlive = null;
+    /* Android Chrome can pause the speech queue when the page loses focus
+       for a moment; a periodic resume keeps it moving without user taps. */
+    keepAlive = setInterval(function () {
+      if (tok !== speechToken) { clearInterval(keepAlive); return; }
+      try { if (speechSynthesis.paused) speechSynthesis.resume(); } catch (e) {}
+    }, 1000);
     (function next() {
-      if (tok !== speechToken || settings.muted || i >= chunks.length) return;
-      var u = new SpeechSynthesisUtterance(expandAbbr(chunks[i++]));
+      if (tok !== speechToken || settings.muted || i >= chunks.length) { if (i >= chunks.length) clearInterval(keepAlive); return; }
+      var spoken = expandAbbr(chunks[i++]), advanced = false, watchdog = null;
+      function adv() { if (advanced) return; advanced = true; if (watchdog) clearTimeout(watchdog); next(); }
+      var u = new SpeechSynthesisUtterance(spoken);
       if (chosenVoice) { u.voice = chosenVoice; u.lang = chosenVoice.lang; } else u.lang = 'en-IN';
       u.rate = settings.rate; u.pitch = 1;
-      u.onend = next; u.onerror = next;
-      try { speechSynthesis.speak(u); } catch (e) { next(); }
+      u.onend = adv; u.onerror = adv;
+      watchdog = setTimeout(adv, chunkBudgetMs(spoken));
+      try { speechSynthesis.speak(u); } catch (e) { adv(); }
     })();
   }
   /* Speak a whole text, fully, in the active voice mode. */

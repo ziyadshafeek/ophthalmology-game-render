@@ -105,6 +105,9 @@
       opts = makeOpts(it.fact, DATA.items.filter(function (x) { return x !== it; }).map(function (x) { return x.fact; }));
     }
     $('pointsTag').textContent = (100 * mult()) + ' PTS + TIME BONUS';
+    /* A fresh round always starts at the top of the screen, so the question
+       is never left below the previous round's answer on a phone. */
+    try { window.scrollTo(0, 0); } catch (e) {}
     var box = $('opts'); box.innerHTML = '';
     opts.forEach(function (o, i) {
       var b = document.createElement('button'); b.className = 'opt';
@@ -116,7 +119,7 @@
     });
     startTimer(L.time); updateHUD();
     if (OphthSettings.autoRead && !OphthSettings.muted && OphthSettings.mode !== 'off') {
-      setTimeout(function () { if (G && !G.locked) speakRound(); }, 400);
+      setTimeout(function () { if (G && !G.locked) { try { speakRound(); } catch (e) {} } }, 400);
     }
   }
   function curSpeechTexts() {
@@ -207,16 +210,27 @@
     if (v && v.note) { noteEl.textContent = '🟨 VERIFIED NOTE: ' + v.note; noteEl.style.display = 'block'; }
     else { noteEl.textContent = ''; noteEl.style.display = 'none'; }
     revealed = true;
+    var last = G.qi >= DATA.levels[G.level].count - 1;
+    var outOfLives = (!good && !G.shield && G.lives <= 0);
+    $('nextBtn').textContent = outOfLives ? 'SEE RESULTS ▶' : (last ? (G.level >= 2 ? 'FINISH ▶' : 'CLEAR LEVEL ▶') : 'NEXT ▶');
+    /* The answer panel is shown FIRST, and scrolled into view, before any
+       voice or sound work runs. That way a voice engine that stalls or
+       throws on a phone can never leave the player staring at a frozen
+       question with NEXT hidden below the fold — the bug reported on the
+       first option tap. The NEXT button is always reachable after this. */
+    fb.classList.add('on');
+    updateHUD();
+    try {
+      if (fb.scrollIntoView) fb.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else window.scrollTo(0, fb.offsetTop || 0);
+    } catch (e) {}
     /* The reveal reading: the ENTIRE yellow note, in full, in the active
        voice mode. It starts here and runs to the last sentence unless the
        player taps NEXT, REPLAY (restarts it), QUIT, or mute. */
     lastRevealText = revealTextFor(it, good, prefix);
-    if (OphthSettings.autoRead && !OphthSettings.muted && OphthSettings.mode !== 'off') OphthVoice.speakFullText(lastRevealText);
-    var last = G.qi >= DATA.levels[G.level].count - 1;
-    var outOfLives = (!good && !G.shield && G.lives <= 0);
-    $('nextBtn').textContent = outOfLives ? 'SEE RESULTS ▶' : (last ? (G.level >= 2 ? 'FINISH ▶' : 'CLEAR LEVEL ▶') : 'NEXT ▶');
-    fb.classList.add('on');
-    updateHUD();
+    if (OphthSettings.autoRead && !OphthSettings.muted && OphthSettings.mode !== 'off') {
+      try { OphthVoice.speakFullText(lastRevealText); } catch (e) {}
+    }
   }
   function nextRound() {
     OphthAudio.sfx('click');
