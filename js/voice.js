@@ -138,10 +138,12 @@
     else if (ttsOK) browserSpeak(chunks);
   }
   function stopSpeak() {
-    if (ttsOK) { try { speechSynthesis.cancel(); } catch (e) {} }
-    speechToken++;
-    piper.token++;
-    if (piper.audio) { try { piper.audio.pause(); } catch (e) {} piper.audio = null; }
+    try {
+      if (ttsOK) { try { speechSynthesis.cancel(); } catch (e) {} }
+      speechToken++;
+      piper.token++;
+      if (piper.audio) { try { piper.audio.pause(); } catch (e) {} piper.audio = null; }
+    } catch (e) {}
   }
   function voiceScore(v) {
     var n = (v.name || '').toLowerCase(), l = (v.lang || '').toLowerCase(), s = 0;

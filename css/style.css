@@ -1,6 +1,6 @@
 :root{--bg:#020610;--panel:#071120;--panel2:#0a1830;--line:#1d3a5f;--text:#e8f6ff;--muted:#8fb4d8;--cyan:#00e5ff;--amber:#ffb300;--yellow:#fef08a;--red:#ff2e63;--green:#2effa8;--orange:#ff7a18;--mag:#ff2ea6;--violet:#8b5cf6;--neon:#00f0ff;--cut:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Sora,system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden}
-html{height:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html{height:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
 body{background-image:radial-gradient(760px 430px at 12% -5%,rgba(0,240,255,.16),transparent 60%),radial-gradient(720px 420px at 92% 0%,rgba(255,46,166,.10),transparent 60%),linear-gradient(rgba(0,240,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.05) 1px,transparent 1px);background-size:auto,auto,34px 34px,34px 34px;min-height:100vh;min-height:100dvh}
 button{font:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}button:focus-visible{outline:2px solid var(--neon);outline-offset:2px}button:disabled{opacity:.4;cursor:default}
 input,select{font-size:16px}
@@ -41,7 +41,7 @@ h1.gameTitle span{color:var(--neon);text-shadow:0 0 34px rgba(0,240,255,.85)}h1.
 .progressDots{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}.dot{width:22px;height:7px;background:#16324f;clip-path:polygon(3px 0,100% 0,calc(100% - 3px) 100%,0 100%)}.dot.done{background:var(--green)}.dot.now{background:var(--neon)}
 .powers{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
 .pwBtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:10px 14px;font-size:18px;clip-path:var(--cut)}.pwBtn.activeShield{border-color:var(--green);box-shadow:0 0 14px rgba(46,255,168,.5)}.pwCount{font-size:13px;color:var(--neon);font-family:"Chakra Petch"}
-.arena{margin-top:4px}.photoStage{text-align:center;margin:12px 0}.photoStage img{max-width:100%;max-height:340px;border:1px solid var(--line);background:#000}
+.arena{margin-top:4px}.photoStage{text-align:center;margin:12px 0;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center}.photoStage img{max-width:100%;max-height:340px;border:1px solid var(--line);background:#000}
 .photoCap{color:var(--muted);font-size:13px;margin-top:6px}
 .qHead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
 .tag{font-family:"Chakra Petch";color:var(--neon);letter-spacing:.08em;font-size:14px}.tag.useTag{color:var(--amber)}.tag.bossTag{color:#ff7ac0}
@@ -49,11 +49,12 @@ h1.gameTitle span{color:var(--neon);text-shadow:0 0 34px rgba(0,240,255,.85)}h1.
 h2{font-family:"Chakra Petch"}.qClue{color:var(--text);line-height:1.6;font-size:16px}
 .hintBox{display:none;background:#1a2b00;border:1px solid #5a7a00;padding:12px;line-height:1.55;margin:10px 0}.hintBox.on{display:block}
 .opts{display:grid;gap:10px;margin:14px 0}
-.opt{display:flex;gap:10px;align-items:center;text-align:left;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:14px;clip-path:var(--cut);font-size:15px;line-height:1.45}
+.opt{display:flex;gap:10px;align-items:center;text-align:left;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:14px;clip-path:var(--cut);font-size:15px;line-height:1.45;transition:border-color .15s,background .15s,transform .1s}.opt:active{transform:scale(.985)}
 .opt:hover{border-color:var(--neon)}.opt.correct{border-color:var(--green);background:#06351f}.opt.wrong{border-color:var(--red);background:#3a0a18}.opt.eliminated{opacity:.25}
 .opt .key{font-family:"Chakra Petch";color:var(--neon);border:1px solid var(--line);padding:4px 9px;flex:none}
 .feedback{display:none;border:1px solid var(--line);background:var(--panel);clip-path:var(--cut);padding:16px;margin:14px 0;line-height:1.6}
-.feedback.on{display:block}.feedback.good{border-color:var(--green)}.feedback.bad{border-color:var(--red)}
+.feedback.on{display:block;animation:fbIn .28s ease both}
+@keyframes fbIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}.feedback.good{border-color:var(--green)}.feedback.bad{border-color:var(--red)}
 /* The answer actions must stay reachable on a phone: NEXT sticks to the
    bottom of the viewport while the player reads the note, instead of
    sitting below the fold where it looked like the game had frozen. */
@@ -82,7 +83,7 @@ h2{font-family:"Chakra Petch"}.qClue{color:var(--text);line-height:1.6;font-size
 h1.gameTitle{font-size:clamp(34px,11vw,56px)}
 .homeBtn{padding:18px 10px;font-size:18px}
 .pill{padding:7px 10px}.pill strong{font-size:16px}
-.photoStage img{max-height:38dvh}
+.photoStage{min-height:180px}.photoStage img{max-height:38dvh}
 .qClue{font-size:15px}
 .opt{min-height:56px;padding:16px 14px;font-size:16px;overflow-wrap:anywhere}
 .btn{min-height:48px;padding:14px 18px}

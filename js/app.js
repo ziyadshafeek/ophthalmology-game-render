@@ -12,8 +12,9 @@
   }
   window.OphthShow = showScreen;
   function goHome() {
-    if (window.OphthVoice) OphthVoice.stopSpeak();
-    if (window.OphthGame) OphthGame.stopGame();
+    try { if (window.OphthVoice) OphthVoice.stopSpeak(); } catch (e) {}
+    try { if (window.OphthGame) OphthGame.stopGame(); } catch (e2) {}
+    try { if (window.OphthGame && OphthGame.refreshResume) OphthGame.refreshResume(); } catch (e3) {}
     showScreen('homeScreen');
     var best = window.OphthGame ? OphthGame.bestScore() : 0;
     var bl = $('bestLine');

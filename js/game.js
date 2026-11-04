@@ -16,14 +16,61 @@
   function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
   var G = null, DATA = null, CARDS = null, FULLNOTES = null, PHOTOMAP = null;
-  var best = 0, lastRevealText = '', lastQuestionText = '', revealed = false;
+  var best = 0, lastRevealText = '', lastQuestionText = '', revealed = false, levelTimer = null;
 
   function ensureData() {
     if (DATA) return Promise.resolve(DATA);
     return Promise.all([OphthData.loadItems(), OphthData.loadCards(), OphthData.loadFullNotes(), OphthData.loadPhotoMap()])
       .then(function (parts) { DATA = parts[0]; CARDS = parts[1]; FULLNOTES = parts[2]; PHOTOMAP = parts[3]; return DATA; });
   }
-  function stopGame() { if (G && G.timer) clearInterval(G.timer); OphthVoice.stopSpeak(); G = null; }
+  function stopGame() { if (G && G.timer) clearInterval(G.timer); try { OphthVoice.stopSpeak(); } catch (e) {} G = null; }
+  /* RESUME: the run is saved to this device on every state change, so
+     closing the tab, going Home, or the phone shutting down mid-game
+     does not lose it. Re-entering the site shows RESUME GAME on Home,
+     which puts the player back on the exact round, level, score and
+     lives they left — with a fresh timer for that round. A finished run
+     (game over / victory) clears the save. Quitting to Home keeps it. */
+  var SAVE_KEY = 'ophth-saved-game';
+  function saveGame() {
+    try {
+      /* Never overwrite a good pre-answer save with a post-answer state:
+         if the player quits while the answer panel is up (NEXT not yet
+         tapped), resuming must re-ask that same round, not re-award its
+         score a second time. */
+      if (!G || !DATA || G.locked) return;
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ level: G.level, score: G.score, lives: G.lives, combo: G.combo, bestCombo: G.bestCombo, correct: G.correct, answered: G.answered, queue: G.queue.map(function (x) { return x.n; }), qi: G.qi, pw: G.pw, shield: G.shield, savedAt: Date.now() }));
+    } catch (e) {}
+  }
+  function clearSavedGame() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+  function readSavedGame() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY); if (!raw) return null;
+      var v = JSON.parse(raw); if (!v || !v.queue || !v.queue.length || typeof v.lives !== 'number') return null;
+      return v;
+    } catch (e) { return null; }
+  }
+  function refreshResume() {
+    var row = $('resumeRow'), btn = $('resumeBtn'); if (!row || !btn) return;
+    var v = readSavedGame();
+    if (v) {
+      var lname = 'LEVEL ' + (v.level + 1);
+      try { if (DATA && DATA.levels && DATA.levels[v.level]) lname = DATA.levels[v.level].name; } catch (e) {}
+      btn.textContent = '↻ RESUME GAME · ' + lname + ' · ROUND ' + (v.qi + 1) + ' · SCORE ' + v.score + ' · ' + v.lives + ' ❤️';
+      row.style.display = 'flex';
+    } else row.style.display = 'none';
+  }
+  function resumeGame() {
+    ensureData().then(function () {
+      var v = readSavedGame();
+      if (!v) { newGame(); return; }
+      var byName = {}; DATA.items.forEach(function (x) { byName[x.n] = x; });
+      var queue = v.queue.map(function (n) { return byName[n]; }).filter(Boolean);
+      if (!queue.length) { clearSavedGame(); newGame(); return; }
+      G = { level: v.level, score: v.score || 0, lives: v.lives, combo: v.combo || 0, bestCombo: v.bestCombo || 0, correct: v.correct || 0, answered: v.answered || 0, queue: queue, qi: Math.min(v.qi, queue.length - 1), timer: null, remain: 0, total: 0, locked: false, shield: !!v.shield, pw: v.pw || { fifty: 1, time: 1, shield: 1, hint: 1 }, spotter: false };
+      $('lvlVal').textContent = DATA.levels[G.level].name;
+      OphthShow('gameScreen'); updateHUD(); showQuestion();
+    });
+  }
   function mult() { return Math.min(5, 1 + Math.floor(G.combo / 3)); }
   function curQ() {
     var item = G.queue[G.qi];
@@ -34,6 +81,7 @@
   function verifiedFor(item) { return OphthData.verifiedNoteFor(item.n, DATA); }
 
   function newGame() {
+    clearSavedGame();
     ensureData().then(function () {
       G = { level: 0, score: 0, lives: 3, combo: 0, bestCombo: 0, correct: 0, answered: 0, queue: [], qi: 0, timer: null, remain: 0, total: 0, locked: false, shield: false, pw: { fifty: 1, time: 1, shield: 1, hint: 1 }, spotter: false };
       OphthShow('gameScreen');
@@ -67,20 +115,21 @@
     for (var i = 0; i < L.count; i++) d += '<span class="dot ' + (i < G.qi ? 'done' : i === G.qi ? 'now' : '') + '"></span>';
     $('dots').innerHTML = d;
     $('qCount').textContent = 'ROUND ' + Math.min(G.qi + 1, L.count) + ' / ' + L.count + (G.level === 2 ? ' · 👑 BOSS' : '');
+    saveGame();
   }
   function makeOpts(correct, pool) {
     var wrong = shuffle(pool.filter(function (x) { return x !== correct; })).slice(0, 3);
     return shuffle([correct].concat(wrong).map(function (t) { return { txt: t, correct: t === correct }; }));
   }
   function showQuestion() {
-    OphthVoice.stopSpeak();
+    try { OphthVoice.stopSpeak(); } catch (e) {}
     G.locked = false; revealed = false;
     var q = curQ(), it = q.item, L = DATA.levels[G.level];
     $('hintBox').classList.remove('on');
     $('feedback').classList.remove('on');
     var photo = photoFor(it), stage = $('photoStage'), pimg = $('photoImg'), pcap = $('photoCap');
     G.spotter = !!(photo && q.mode === 'id');
-    if (photo) { stage.style.display = 'block'; pimg.src = photo; pimg.alt = 'Photograph of the instrument for this round — identify it'; pcap.style.display = 'none'; }
+    if (photo) { stage.style.display = 'block'; pimg.onerror = function () { stage.style.display = 'none'; }; pimg.src = photo; pimg.alt = 'Photograph of the instrument for this round — identify it'; pcap.style.display = 'none'; }
     else { stage.style.display = 'none'; pimg.removeAttribute('src'); }
     var opts = [];
     if (G.spotter) {
@@ -107,7 +156,7 @@
     $('pointsTag').textContent = (100 * mult()) + ' PTS + TIME BONUS';
     /* A fresh round always starts at the top of the screen, so the question
        is never left below the previous round's answer on a phone. */
-    try { window.scrollTo(0, 0); } catch (e) {}
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} }
     var box = $('opts'); box.innerHTML = '';
     opts.forEach(function (o, i) {
       var b = document.createElement('button'); b.className = 'opt';
@@ -135,7 +184,7 @@
     });
     return texts;
   }
-  function speakRound() { lastQuestionText = curSpeechTexts().join(' '); OphthVoice.speakTexts(curSpeechTexts()); }
+  function speakRound() { try { lastQuestionText = curSpeechTexts().join(' '); OphthVoice.speakTexts(curSpeechTexts()); } catch (e) {} }
   function startTimer(sec) {
     clearInterval(G.timer); G.total = sec; G.remain = sec; var lastTick = 99; tickUI();
     G.timer = setInterval(function () {
@@ -180,7 +229,7 @@
   }
   function answer(btn) {
     if (G.locked) return;
-    G.locked = true; clearInterval(G.timer); OphthVoice.stopSpeak();
+    G.locked = true; clearInterval(G.timer); try { OphthVoice.stopSpeak(); } catch (e) {}
     var good = btn.dataset.correct === '1';
     if (!good) btn.classList.add('wrong');
     try { markCorrect(); resolve(good, curQ(), good ? '' : '✖ WRONG — that was a look-alike. '); }
@@ -241,7 +290,7 @@
     fb.classList.add('on');
     updateHUD();
     try {
-      if (fb.scrollIntoView) fb.scrollIntoView({ behavior: 'auto', block: 'start' });
+      if (fb.scrollIntoView) fb.scrollIntoView({ behavior: 'smooth', block: 'start' });
       else window.scrollTo(0, fb.offsetTop || 0);
     } catch (e) {}
     /* The reveal reading: the ENTIRE yellow note, in full, in the active
@@ -262,22 +311,37 @@
     }
   }
   function nextRound() {
-    OphthAudio.sfx('click');
-    OphthVoice.stopSpeak(); /* user tapped NEXT: the only allowed cut-off */
+    /* NEXT must advance no matter what: sound and voice are best-effort
+       only, and the advance itself has a fallback. Previously sfx() was
+       the first call here and a throwing sound engine (closed
+       AudioContext on a phone) killed the whole tap, leaving the game
+       frozen on the answer panel — the stuck NEXT in the screenshot. */
+    try { OphthAudio.sfx('click'); } catch (e) {}
+    try { OphthVoice.stopSpeak(); } catch (e) {} /* user tapped NEXT: the only allowed cut-off */
     if (!G) return;
-    if (G.lives <= 0) { gameOver(); return; }
-    if (G.qi < DATA.levels[G.level].count - 1) { G.qi++; showQuestion(); return; }
-    if (G.level < 2) {
-      var L = DATA.levels[G.level + 1];
-      G.score += 250;
-      $('lvlKick').textContent = 'LEVEL ' + (G.level + 1) + ' CLEARED · +250 BONUS';
-      $('lvlTitle').textContent = L.title;
-      $('lvlDesc').textContent = L.desc;
-      $('lvlBonus').textContent = 'SCORE ' + G.score + ' · LIVES ' + G.lives + ' · BEST COMBO ' + G.bestCombo;
-      var ov = $('levelOverlay'); ov.classList.add('on');
-      OphthAudio.sfx('level');
-      setTimeout(function () { ov.classList.remove('on'); buildLevel(G.level + 1); }, 2400);
-    } else victory();
+    try {
+      if (G.lives <= 0) { gameOver(); return; }
+      if (G.qi < DATA.levels[G.level].count - 1) { G.qi++; showQuestion(); return; }
+      if (G.level < 2) {
+        var L = DATA.levels[G.level + 1];
+        G.score += 250;
+        $('lvlKick').textContent = 'LEVEL ' + (G.level + 1) + ' CLEARED · +250 BONUS';
+        $('lvlTitle').textContent = L.title;
+        $('lvlDesc').textContent = L.desc;
+        $('lvlBonus').textContent = 'SCORE ' + G.score + ' · LIVES ' + G.lives + ' · BEST COMBO ' + G.bestCombo;
+        var ov = $('levelOverlay'); ov.classList.add('on');
+        try { OphthAudio.sfx('level'); } catch (e2) {}
+        if (levelTimer) clearTimeout(levelTimer);
+        levelTimer = setTimeout(function () { levelTimer = null; try { ov.classList.remove('on'); buildLevel(G.level + 1); } catch (e3) {} }, 1600);
+      } else victory();
+    } catch (e) {
+      /* Last resort: never leave the player on a dead panel. G.qi is
+         already the next round at this point, so re-show it (do NOT
+         increment again, or a round is skipped); if even that fails,
+         end the run with the score so far. */
+      try { showQuestion(); }
+      catch (e2) { try { gameOver(); } catch (e3) {} }
+    }
   }
   function fillEnd() {
     best = Math.max(best, G.score);
@@ -288,27 +352,39 @@
     $('rankLine').textContent = 'RANK: ' + (G.score >= 3500 ? '🏆 CONSULTANT' : G.score >= 2200 ? '⭐ SENIOR RESIDENT' : G.score >= 1100 ? '🎓 RESIDENT' : '🩺 INTERN — KEEP GRINDING');
   }
   function gameOver() {
+    clearSavedGame(); refreshResume();
     if (G) clearInterval(G.timer);
-    OphthVoice.stopSpeak(); OphthAudio.sfx('over');
+    try { OphthVoice.stopSpeak(); } catch (e) {} try { OphthAudio.sfx('over'); } catch (e2) {}
     $('endKick').textContent = 'GAME OVER';
     $('endTitle').textContent = '💀 FLATLINED';
     $('endDesc').textContent = 'You ran out of lives in ' + DATA.levels[G.level].title + '. Run it back and take the arena.';
     fillEnd(); OphthShow('resultsScreen');
   }
   function victory() {
-    OphthVoice.stopSpeak(); OphthAudio.sfx('win');
+    clearSavedGame(); refreshResume();
+    try { OphthVoice.stopSpeak(); } catch (e) {} try { OphthAudio.sfx('win'); } catch (e2) {}
     $('endKick').textContent = '👑 BOSS DEFEATED';
     $('endTitle').textContent = 'ARENA CLEARED!';
     $('endDesc').textContent = 'You beat the Consultant boss round. That is a full viva instrument set, played at speed.';
     fillEnd(); OphthShow('resultsScreen');
   }
   document.addEventListener('DOMContentLoaded', function () {
-    $('playBtn').onclick = function () { OphthAudio.ac(); OphthAudio.sfx('level'); newGame(); };
-    $('againBtn').onclick = function () { OphthAudio.sfx('click'); newGame(); };
+    refreshResume();
+    if ($('resumeBtn')) $('resumeBtn').onclick = function () { try { OphthAudio.ac(); OphthAudio.sfx('level'); } catch (e) {} resumeGame(); };
+    if ($('levelOverlay')) $('levelOverlay').onclick = function () {
+      if (!levelTimer || !G) return;
+      clearTimeout(levelTimer); levelTimer = null;
+      $('levelOverlay').classList.remove('on');
+      try { buildLevel(G.level + 1); } catch (e) {}
+    };
+    window.addEventListener('pagehide', saveGame);
+    window.addEventListener('beforeunload', saveGame);
+    $('playBtn').onclick = function () { try { OphthAudio.ac(); OphthAudio.sfx('level'); } catch (e) {} newGame(); };
+    $('againBtn').onclick = function () { try { OphthAudio.sfx('click'); } catch (e) {} newGame(); };
     $('menuBtn').onclick = function () { OphthHome(); };
-    $('quitGameBtn').onclick = function () { OphthVoice.stopSpeak(); OphthHome(); };
+    $('quitGameBtn').onclick = function () { try { OphthVoice.stopSpeak(); } catch (e) {} OphthHome(); };
     $('nextBtn').onclick = nextRound;
-    $('replayRevealBtn').onclick = function () { if (lastRevealText) OphthVoice.speakFullText(lastRevealText); };
+    $('replayRevealBtn').onclick = function () { if (lastRevealText) { try { OphthVoice.speakFullText(lastRevealText); } catch (e) {} } };
     $('speakerBtn').onclick = function () {
       if (revealed && lastRevealText) OphthVoice.speakFullText(lastRevealText);
       else if (G && !G.locked) speakRound();
@@ -344,5 +420,5 @@
       if (b && !b.disabled) b.click();
     });
   });
-  window.OphthGame = { newGame: newGame, stopGame: stopGame, bestScore: function () { return best; }, revealTextFor: revealTextFor, _mult: mult, _shuffle: shuffle, _makeOpts: makeOpts };
+  window.OphthGame = { newGame: newGame, resumeGame: resumeGame, refreshResume: refreshResume, stopGame: stopGame, bestScore: function () { return best; }, revealTextFor: revealTextFor, _mult: mult, _shuffle: shuffle, _makeOpts: makeOpts };
 })();

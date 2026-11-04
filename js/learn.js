@@ -79,7 +79,7 @@
   }
   function grade(gotIt) {
     if (!L || !L.cur || !L.flipped) return;
-    OphthVoice.stopSpeak(); /* user tap */
+    try { OphthVoice.stopSpeak(); } catch (e) {} /* user tap */
     var c = L.cur; L.reviews++; L.cur = null; var msg;
     if (gotIt) {
       L.got++; c.streak++;
@@ -102,8 +102,8 @@
     OphthAudio.sfx('win'); OphthVoice.stopSpeak();
   }
   function openLearn() {
-    OphthVoice.stopSpeak();
-    if (window.OphthGame) OphthGame.stopGame();
+    try { OphthVoice.stopSpeak(); } catch (e) {}
+    try { if (window.OphthGame) OphthGame.stopGame(); } catch (e2) {}
     OphthData.loadCards().then(function (cards) {
       CARDS = cards;
       OphthShow('learnScreen');
@@ -112,11 +112,11 @@
     });
   }
   function closeLearn() {
-    OphthVoice.stopSpeak();
+    try { OphthVoice.stopSpeak(); } catch (e) {}
     OphthShow('homeScreen');
   }
   document.addEventListener('DOMContentLoaded', function () {
-    $('learnBtn').onclick = function () { OphthAudio.ac(); OphthAudio.sfx('level'); openLearn(); };
+    $('learnBtn').onclick = function () { try { OphthAudio.ac(); OphthAudio.sfx('level'); } catch (e) {} openLearn(); };
     $('learnExit').onclick = closeLearn;
     $('flipCard').onclick = flip;
     $('flipCard').onkeydown = function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } };
