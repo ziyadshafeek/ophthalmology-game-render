@@ -154,17 +154,37 @@
   function timeoutAnswer() {
     if (G.locked) return;
     G.locked = true; OphthVoice.stopSpeak();
-    markCorrect(); resolve(false, curQ(), '⏰ TIME UP! ');
+    try { markCorrect(); resolve(false, curQ(), '⏰ TIME UP! '); }
+    catch (e) { fallbackReveal(curQ().item); }
   }
   function markCorrect() {
     document.querySelectorAll('.opt').forEach(function (b) { b.disabled = true; if (b.dataset.correct === '1') b.classList.add('correct'); });
+  }
+  var revealSeq = 0;
+  /* Last-resort safety net: whatever throws inside the reveal (voice,
+     sound, a data lookup), a tap must ALWAYS land on a visible answer
+     panel with a working NEXT. This can never again leave a player
+     staring at a frozen question. */
+  function fallbackReveal(it) {
+    try {
+      markCorrect();
+      $('fbTitle').textContent = 'Correct answer: ' + it.n;
+      $('fbUse').textContent = it.use;
+      $('fbFact').textContent = '★ VIVA FACT: ' + it.fact;
+      $('fbNote').style.display = 'none'; $('fbFull').style.display = 'none';
+      $('nextBtn').textContent = 'NEXT ▶';
+      var fb = $('feedback'); fb.className = 'feedback on';
+      updateHUD();
+      try { fb.scrollIntoView({ behavior: 'auto', block: 'start' }); } catch (e) {}
+    } catch (e2) {}
   }
   function answer(btn) {
     if (G.locked) return;
     G.locked = true; clearInterval(G.timer); OphthVoice.stopSpeak();
     var good = btn.dataset.correct === '1';
     if (!good) btn.classList.add('wrong');
-    markCorrect(); resolve(good, curQ(), good ? '' : '✖ WRONG — that was a look-alike. ');
+    try { markCorrect(); resolve(good, curQ(), good ? '' : '✖ WRONG — that was a look-alike. '); }
+    catch (e) { fallbackReveal(curQ().item); }
   }
   function revealTextFor(it, good, prefix) {
     var v = verifiedFor(it);
@@ -221,15 +241,24 @@
     fb.classList.add('on');
     updateHUD();
     try {
-      if (fb.scrollIntoView) fb.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (fb.scrollIntoView) fb.scrollIntoView({ behavior: 'auto', block: 'start' });
       else window.scrollTo(0, fb.offsetTop || 0);
     } catch (e) {}
     /* The reveal reading: the ENTIRE yellow note, in full, in the active
        voice mode. It starts here and runs to the last sentence unless the
-       player taps NEXT, REPLAY (restarts it), QUIT, or mute. */
+       player taps NEXT, REPLAY (restarts it), QUIT, or mute. It starts a
+       beat after the tap (300 ms) so Android's speech queue can finish
+       cancelling the question reading first — a cancelled queue that is
+       immediately re-fed is a known Android Chrome stall — and it is
+       guarded so a NEXT tap in that beat never starts stale speech over
+       the next question. */
     lastRevealText = revealTextFor(it, good, prefix);
+    var mySeq = ++revealSeq;
     if (OphthSettings.autoRead && !OphthSettings.muted && OphthSettings.mode !== 'off') {
-      try { OphthVoice.speakFullText(lastRevealText); } catch (e) {}
+      setTimeout(function () {
+        if (mySeq !== revealSeq || !G || !G.locked) return;
+        try { OphthVoice.speakFullText(lastRevealText); } catch (e) {}
+      }, 300);
     }
   }
   function nextRound() {
