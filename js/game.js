@@ -130,7 +130,14 @@
     $('feedback').classList.remove('on');
     var photo = photoFor(it), stage = $('photoStage'), pimg = $('photoImg'), pcap = $('photoCap');
     G.spotter = !!(photo && q.mode === 'id');
-    if (photo) { stage.style.display = 'block'; pimg.onerror = function () { stage.style.display = 'none'; }; pimg.src = photo; pimg.alt = 'Photograph of the instrument for this round — identify it'; pcap.style.display = 'none'; }
+    if (photo) {
+      stage.style.display = 'block'; pcap.style.display = 'none';
+      pimg.style.visibility = 'hidden';
+      pimg.onload = function () { pimg.style.visibility = 'visible'; };
+      pimg.onerror = function () { stage.style.display = 'none'; };
+      pimg.removeAttribute('src'); pimg.src = photo;
+      pimg.alt = 'Photograph of the instrument for this round — identify it';
+    }
     else { stage.style.display = 'none'; pimg.removeAttribute('src'); }
     var opts = [];
     if (G.spotter) {

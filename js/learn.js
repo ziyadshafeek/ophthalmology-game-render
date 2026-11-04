@@ -48,7 +48,7 @@
     fc.classList.remove('flipped');
     $('lfTag').textContent = 'CARD ' + v.id + ' · ' + (v.c || 'INSTRUMENT') + ' · FRONT';
     var im = $('lfImg');
-    if (v.photo) { im.src = v.photo; im.alt = 'Photograph: ' + v.n; im.style.display = 'block'; }
+    if (v.photo) { im.style.visibility = 'hidden'; im.onload = function () { im.style.visibility = 'visible'; }; im.removeAttribute('src'); im.src = v.photo; im.alt = 'Photograph: ' + v.n; im.style.display = 'block'; }
     else { im.removeAttribute('src'); im.style.display = 'none'; }
     $('lfQ').textContent = v.photo ? '📸 Name this instrument — and its use' : 'Name this instrument — and its use';
     $('lfCue').textContent = v.q || '';
