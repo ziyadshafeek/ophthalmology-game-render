@@ -33,6 +33,19 @@
   window.saveOphthSettings = saveSettings;
 
   var PIPER_VOICE = 'en_US-amy-low';
+  /* Voice log: written to #voiceLog in Settings (if present) so the user
+     can read exactly what stopped voice, instead of guessing. Never
+     throws, never blocks speech. */
+  function vlog(msg) {
+    try {
+      var el = document.getElementById('voiceLog');
+      if (!el) return;
+      var lines = (el.textContent || '').split('\n').filter(Boolean);
+      lines.push(msg);
+      if (lines.length > 10) lines = lines.slice(-10);
+      el.textContent = lines.join('\n');
+    } catch (e) {}
+  }
   var piper = { state: 'idle', pct: 0, mod: null, token: 0, audio: null, slow: false };
   var ttsOK = ('speechSynthesis' in window);
   var chosenVoice = null, voiceNatural = false, speaking = false;
@@ -77,6 +90,12 @@
     var chunks = pendingChunks; pendingChunks = null; pendingTokens = null;
     piperSpeak(chunks);
   }
+  function flushPendingToBrowser() {
+    if (!pendingChunks || !pendingTokens) return;
+    if (pendingTokens.st !== speechToken || pendingTokens.pt !== piper.token || pendingTokens.wt !== wp.token) { pendingChunks = null; pendingTokens = null; return; }
+    var chunks = pendingChunks; pendingChunks = null; pendingTokens = null;
+    if (ttsOK) { vlog('Local model failed — falling back to browser voice.'); browserSpeak(chunks); }
+  }
   function initPiperWorker() {
     if (wp.state === 'loading' || wp.state === 'ready') return;
     if (typeof Worker === 'undefined') { wp.state = 'failed'; initPiperMain(); return; }
@@ -87,13 +106,13 @@
       w.onmessage = function (ev) {
         var d = ev.data || {};
         if (d.type === 'progress') { wp.pct = d.pct || 0; updateVoiceStatus(); }
-        else if (d.type === 'ready') { wp.state = 'ready'; wp.pct = 1; updateVoiceStatus(); flushPending(); }
-        else if (d.type === 'failed') { wp.state = 'failed'; updateVoiceStatus(); initPiperMain(); }
+        else if (d.type === 'ready') { wp.state = 'ready'; wp.pct = 1; vlog('Local model ready (worker).'); updateVoiceStatus(); flushPending(); }
+        else if (d.type === 'failed') { wp.state = 'failed'; vlog('Local worker failed: ' + (d.error || 'unknown')); updateVoiceStatus(); initPiperMain(); }
         else if (d.type === 'result') {
           var p = wp.pending[d.id]; if (p) { delete wp.pending[d.id]; if (d.error) p.reject(new Error(d.error)); else p.resolve(d.blob); }
         }
       };
-      w.onerror = function () { if (wp.state !== 'ready') { wp.state = 'failed'; updateVoiceStatus(); initPiperMain(); } };
+      w.onerror = function () { if (wp.state !== 'ready') { wp.state = 'failed'; vlog('Local worker error (could not start).'); updateVoiceStatus(); initPiperMain(); } };
       w.postMessage({ type: 'init' });
     } catch (e) { wp.state = 'failed'; updateVoiceStatus(); initPiperMain(); }
   }
@@ -111,8 +130,8 @@
     import('https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm').then(function (mod) {
       piper.mod = mod;
       return mod.download(PIPER_VOICE, function (pr) { if (pr && pr.total) piper.pct = Math.max(piper.pct, pr.loaded / pr.total); });
-    }).then(function () { piper.state = 'ready'; piper.pct = 1; updateVoiceStatus(); flushPending(); })
-      .catch(function () { piper.state = 'failed'; updateVoiceStatus(); });
+    }).then(function () { piper.state = 'ready'; piper.pct = 1; vlog('Local model ready (main thread).'); updateVoiceStatus(); flushPending(); })
+      .catch(function () { piper.state = 'failed'; vlog('Local model download failed.'); updateVoiceStatus(); if (wp.state === 'failed') flushPendingToBrowser(); });
   }
   function initPiper() {
     if (isMobile) initPiperWorker();
@@ -175,9 +194,9 @@
         piper.audio = a; a.src = url;
         try { a.playbackRate = settings.rate; a.preservesPitch = true; } catch (e) {}
         a.onended = function () { URL.revokeObjectURL(url); if (piper.audio === a) piper.audio = null; adv(); };
-        a.onerror = function () { URL.revokeObjectURL(url); adv(); };
-        var p = a.play(); if (p && p.catch) p.catch(adv);
-      }).catch(adv);
+        a.onerror = function () { vlog('Local audio playback error.'); URL.revokeObjectURL(url); adv(); };
+        var p = a.play(); if (p && p.catch) p.catch(function (e) { vlog('Local audio play blocked: ' + String((e && e.message) || e)); adv(); });
+      }).catch(function (e) { vlog('Local synthesis failed: ' + String((e && e.message) || e)); adv(); });
     })();
   }
   var speechToken = 0;
@@ -208,6 +227,7 @@
         u.rate = settings.rate; u.pitch = 1;
         u.onend = adv;
         u.onerror = function () {
+          vlog('Browser voice error on this chunk.');
           if (!useDefault && !isMobile && chosenVoice) { try { if (watchdog) clearTimeout(watchdog); } catch (e) {} speakChunk(true); }
           else adv();
         };
@@ -239,6 +259,7 @@
            phone. stopSpeak() clears the queue, so a moved-on question
            never speaks stale text. */
         pendingChunks = chunks; pendingTokens = { st: speechToken, pt: piper.token, wt: wp.token };
+        vlog('Local model still loading — reading queued, will speak when ready.');
         setSpeaking(false);
       }
       else if (ttsOK) browserSpeak(chunks);
@@ -246,7 +267,7 @@
   }
   /* Speak a whole text, fully, in the active voice mode. */
   function speakFullText(text) {
-    if (settings.muted || settings.mode === 'off') return;
+    if (settings.muted || settings.mode === 'off') { vlog('Voice blocked by setting: ' + (settings.muted ? 'muted' : 'mode off')); return; }
     startChunks(splitFull(text));
   }
   /* Speak an explicit list of texts, fully, in order (used for questions). */

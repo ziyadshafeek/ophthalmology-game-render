@@ -143,6 +143,19 @@
       if (OphthSettings.muted) OphthVoice.stopSpeak();
       syncSettingsUI();
     };
+    $('soundTestBtn').onclick = function () {
+      /* Tap-synchronous beep: no network, no model, no TTS. If this
+         beep is heard, the phone's audio output works and the problem
+         is voice-only. If this beep is silent, the problem is the
+         phone / browser / site sound, not the voice engine. */
+      try { OphthAudio.ac(); OphthAudio.sfx('win'); } catch (e) {}
+    };
+    $('resetSoundBtn').onclick = function () {
+      OphthSettings.sounds = true; OphthSettings.muted = false;
+      OphthSettings.mode = 'local'; OphthSettings.autoRead = true;
+      saveOphthSettings(); syncSettingsUI();
+      try { OphthVoice.initPiper(); } catch (e) {}
+    };
     $('testVoiceBtn').onclick = function () {
       /* A direct user tap, so the phone's speech engine is definitely
          allowed to speak — if this is silent, the problem is the phone's
